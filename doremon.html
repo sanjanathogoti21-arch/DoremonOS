@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DoremonOS</title>
     <meta name="theme-color" content="#0A9BE8">
     <meta name="description" content="DoremonOS: a Doraemon-inspired desktop environment in a single HTML file, with a gadget dock, draggable windows and a pocketful of apps.">
@@ -438,6 +438,29 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+
+        /* Keep the desktop usable on narrow screens while preserving the OS layout. */
+        .window { min-width: min(320px, calc(100vw - 60px)); }
+        @media (max-width: 640px) {
+            .window:not(.maximized):not(.snapped-left):not(.snapped-right) {
+                left: 60px !important;
+                top: 36px !important;
+                width: calc(100vw - 60px) !important;
+                height: calc(100vh - 36px) !important;
+                min-width: 0;
+            }
+            #desktop-icons { left: 66px; gap: 6px; }
+            .desktop-shortcut { width: 66px; padding: 4px 2px; }
+            .desktop-shortcut .icon { font-size: 25px; }
+            #activities-overlay { padding: 18px 12px; }
+        }
+        #desktop.light-theme { background: linear-gradient(180deg,#e8f5ff 0%,#b9e3fb 100%) !important; color:#17324d; }
+        #desktop.light-theme #top-bar { background:rgba(21,83,132,.96); }
+        #desktop.light-theme #dock { background:rgba(21,83,132,.82); }
+        #desktop.light-theme .window { background:#eaf4fb; color:#17324d; }
+        #desktop.light-theme .win-header { background:#b9dcf3; color:#17324d; }
+        #desktop.light-theme .window.focused .win-header { background:#168dd1; color:#fff; }
+        #desktop.light-theme .win-content { background:#f5faff; color:#17324d; }
     </style>
 </head>
 <body>
@@ -489,6 +512,10 @@
         <div class="desktop-shortcut" onclick="DoremonOS.selectShortcut(this)" ondblclick="DoremonOS.launch('files', '/home/nobita/Documents')">
             <div class="icon">📁</div>
             <div class="label">Documents</div>
+        </div>
+        <div class="desktop-shortcut" onclick="DoremonOS.selectShortcut(this)" ondblclick="DoremonOS.launch('learn')">
+            <div class="icon">🐧</div>
+            <div class="label">Linux Learning</div>
         </div>
     </div>
 
@@ -636,6 +663,11 @@ Windows: drag to a screen edge to snap, resize from any side, double-click a tit
     }
 };
 
+// Render user-entered terminal text as text, never as executable markup.
+const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[char]));
+
 // 2. Web Audio Synthesizer (for sound effects and Gian Concert ambient tracks)
 class AudioSynth {
     constructor() {
@@ -689,6 +721,7 @@ const audio = new AudioSynth();
 
 // 3. Application Registry
 const APPS = {
+    learn: { title: 'Linux Learning Path', icon: '🐧', width: 720, height: 500 },
     terminal: { title: 'Gadget Terminal', icon: '💻', width: 680, height: 440 },
     files: { title: '4D Pocket Files', icon: '🎒', width: 780, height: 500 },
     browser: { title: 'Anywhere Door Browser', icon: '🚪', width: 840, height: 540 },
@@ -715,6 +748,7 @@ window.DoremonOS = {
         brightness: 100,
         wallpaper: 'radial-gradient(ellipse 240px 64px at 18% 24%, rgba(255,255,255,0.95), rgba(255,255,255,0) 70%), radial-gradient(ellipse 320px 84px at 74% 16%, rgba(255,255,255,0.9), rgba(255,255,255,0) 70%), radial-gradient(ellipse 280px 72px at 58% 66%, rgba(255,255,255,0.75), rgba(255,255,255,0) 70%), linear-gradient(180deg, #67CBFF 0%, #1E9BE9 55%, #0B63B0 100%)'
     },
+    learningProgress: new Set(),
 
     init() {
         this.renderDock();
@@ -734,6 +768,7 @@ window.DoremonOS = {
         // Launch default welcome windows
         this.launch('terminal');
         this.launch('files');
+        this.launch('learn');
     },
 
     updateClock() {
@@ -998,6 +1033,9 @@ window.DoremonOS = {
             case 'terminal':
                 this.renderTerminal(container);
                 break;
+            case 'learn':
+                this.renderLearningPath(container);
+                break;
             case 'files':
                 this.renderFiles(container, param || '/home/nobita');
                 break;
@@ -1028,6 +1066,93 @@ window.DoremonOS = {
         }
     },
 
+    renderLearningPath(el) {
+        el.innerHTML = `
+            <div style="height:100%; overflow:auto; padding:22px; background:linear-gradient(145deg,#0f2d4d,#15436b); color:#f0f7ff;">
+                <div style="max-width:680px; margin:0 auto;">
+                    <div style="font-size:11px; color:#a9cdee; text-transform:uppercase; letter-spacing:1px;">Beginner learning path · Mission 1</div>
+                    <h2 style="margin:6px 0; font-size:24px;">Make a home for your project</h2>
+                    <p style="margin:0 0 16px; color:#c7dbee; line-height:1.55;">Practice a few everyday Linux commands in a safe simulator. These commands only change DoremonOS’s sample files; they never run on your computer.</p>
+                    <div style="height:8px; background:#0a2542; border-radius:8px; overflow:hidden; margin:14px 0 6px;"><div id="learn-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#0a9be8,#74dcbd); transition:width .2s;"></div></div>
+                    <div id="learn-progress-label" style="font-size:11px; color:#a9cdee; text-align:right;">0 of 5 steps done</div>
+                    <div id="learn-steps" style="display:grid; gap:9px; margin-top:14px;"></div>
+                    <div style="margin-top:16px; padding:13px 14px; border-radius:10px; background:rgba(10,37,66,.8); border:1px solid rgba(255,255,255,.12);">
+                        <div style="font-weight:700; color:#ffda75; margin-bottom:4px;">💡 Beginner tip</div>
+                        <div id="learn-tip" style="font-size:12px; color:#d5e5f3; line-height:1.55;">Commands are small instructions. Try one, read the result, and change nothing on your real device.</div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+                        <button onclick="DoremonOS.resetLearningPath()" style="padding:7px 11px; border-radius:7px; border:1px solid #47749b; background:#1a4266; color:white; cursor:pointer;">Reset progress</button>
+                        <button onclick="DoremonOS.launch('terminal')" style="padding:7px 11px; border-radius:7px; border:0; background:#0a9be8; color:white; cursor:pointer; font-weight:700;">Open Practice Terminal</button>
+                    </div>
+                    <p style="font-size:10px; color:#8fb8dc; margin-top:14px;">Learning guide is a built-in demo helper. It does not call an AI service.</p>
+                </div>
+            </div>`;
+        this.updateLearningPath();
+    },
+
+    startLearningCommand(command) {
+        this.launch('terminal');
+        const terminalWindow = Object.values(this.windows).find(win => win.appId === 'terminal');
+        const input = terminalWindow && terminalWindow.el.querySelector('.win-content input');
+        if (input) {
+            input.value = command;
+            input.focus();
+        }
+    },
+
+    recordLearningCommand(command) {
+        this.learningProgress.add(command);
+        this.updateLearningPath();
+    },
+
+    resetLearningPath() {
+        this.learningProgress.clear();
+        this.updateLearningPath();
+    },
+
+    updateLearningPath() {
+        const win = Object.values(this.windows).find(item => item.appId === 'learn');
+        const root = win && win.el.querySelector('.win-content');
+        const list = root && root.querySelector('#learn-steps');
+        if (!list) return;
+        const steps = [
+            { command: 'pwd', title: 'Find your current location', explanation: 'pwd means “print working directory.” It tells you which folder the terminal is in.' },
+            { command: 'ls', title: 'Look around the home folder', explanation: 'ls lists files and folders so you can see what is available.' },
+            { command: 'cat Welcome.txt', title: 'Read the welcome note', explanation: 'cat displays a text file in the terminal without changing it.' },
+            { command: 'mkdir Projects', title: 'Create a project folder', explanation: 'mkdir means “make directory.” It creates a folder named Projects.' },
+            { command: 'cp Welcome.txt Projects/', title: 'Copy the note into Projects', explanation: 'cp copies a file. The first path is the file; the second is its destination.' }
+        ];
+        list.innerHTML = '';
+        let completed = 0;
+        steps.forEach((step, index) => {
+            const done = this.learningProgress.has(step.command);
+            if (done) completed++;
+            const row = document.createElement('div');
+            row.style.cssText = `display:flex; gap:10px; align-items:center; padding:10px; border-radius:9px; background:${done ? 'rgba(26,112,78,.35)' : 'rgba(255,255,255,.06)'}; border:1px solid ${done ? 'rgba(105,218,165,.45)' : 'rgba(255,255,255,.08)'}`;
+            const label = document.createElement('div');
+            label.style.cssText = 'flex:1; min-width:0;';
+            const title = document.createElement('div');
+            title.style.cssText = 'font-size:12px; font-weight:700;';
+            title.textContent = `${done ? '✓' : `${index + 1}.`} ${step.title}`;
+            const explanation = document.createElement('div');
+            explanation.style.cssText = 'font-size:10px; color:#bcd8f0; margin-top:2px;';
+            explanation.textContent = step.explanation;
+            label.append(title, explanation);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = done ? 'Repeat' : `Try: ${step.command}`;
+            button.style.cssText = 'max-width:46%; padding:6px 9px; border-radius:7px; border:1px solid #47749b; background:#16466f; color:white; cursor:pointer; font:11px var(--font-mono);';
+            button.addEventListener('click', () => this.startLearningCommand(step.command));
+            row.append(label, button);
+            list.append(row);
+        });
+        const bar = root.querySelector('#learn-progress-bar');
+        const text = root.querySelector('#learn-progress-label');
+        bar.style.width = `${completed * 20}%`;
+        text.textContent = completed === steps.length ? 'Mission complete — great work!' : `${completed} of ${steps.length} steps done`;
+        if (completed === steps.length) root.querySelector('#learn-tip').textContent = 'You used pwd, ls, cat, mkdir, and cp. Try the mission again, then explore help in the terminal.';
+    },
+
     renderTerminal(el) {
         el.style.backgroundColor = '#0b2f57';
         el.style.fontFamily = "'Ubuntu Mono', monospace";
@@ -1040,7 +1165,7 @@ window.DoremonOS = {
         el.innerHTML = `
             <div id="${el.id}-logs" style="line-height:1.5;">
                 <div style="color:#a9cdee;">DoremonOS 1.0 · 4D Pocket Edition</div>
-                <div style="color:#a9cdee; margin-bottom:8px;">Type <b>help</b>, <b>gadget</b>, <b>neofetch</b>, or <b>dorayaki</b> to explore.</div>
+                <div style="color:#a9cdee; margin-bottom:8px;">Practice shell only — commands run in this page, not on your computer. Type <b>help</b> to see beginner commands.</div>
             </div>
             <div style="display:flex; align-items:baseline; margin-top:4px;">
                 <span style="color:#ffd60a; font-weight:bold;">nobita@4d-pocket</span>:<span style="color:#8fd0ff; font-weight:bold;">~</span>$ &nbsp;
@@ -1056,7 +1181,7 @@ window.DoremonOS = {
             if (e.key === 'Enter') {
                 const val = input.value.trim();
                 input.value = '';
-                logs.innerHTML += `<div><span style="color:#ffd60a; font-weight:bold;">nobita@4d-pocket</span>:<span style="color:#8fd0ff; font-weight:bold;">~</span>$ ${val}</div>`;
+                logs.innerHTML += `<div><span style="color:#ffd60a; font-weight:bold;">nobita@4d-pocket</span>:<span style="color:#8fd0ff; font-weight:bold;">~</span>$ ${escapeHTML(val)}</div>`;
                 if (!val) return;
 
                 const args = val.split(' ');
@@ -1071,6 +1196,8 @@ window.DoremonOS = {
   ls        - List files
   cat FILE  - View file content
   echo TEXT - Output text
+  mkdir DIR - Create a practice folder
+  cp FILE DIR - Copy a practice file into a folder
   htop      - Live process viewer
   matrix    - Falling code simulation
   clear     - Clear terminal screen</div>`;
@@ -1097,17 +1224,48 @@ window.DoremonOS = {
                         </div>
                     </div>`;
                 } else if (cmd === 'ls') {
-                    const list = MockFS.list('/home/nobita/Desktop').map(f => f.split('/').pop()).join('   ');
-                    logs.innerHTML += `<div style="color:#4a90d9; font-weight:bold; margin:2px 0;">Desktop   Documents   Downloads   Music   Pictures   ${list}</div>`;
+                    const list = MockFS.list('/home/nobita/Desktop').filter(f => !f.endsWith('/.keep')).map(f => escapeHTML(f.split('/').pop())).join('   ');
+                    const projects = MockFS.get('/home/nobita/Projects/.keep') ? '   Projects/' : '';
+                    logs.innerHTML += `<div style="color:#4a90d9; font-weight:bold; margin:2px 0;">Desktop   Documents   Downloads   Music   Pictures${projects}   ${list}</div>`;
+                    this.recordLearningCommand('ls');
+                } else if (cmd === 'pwd') {
+                    logs.innerHTML += `<div style="color:#eee;">/home/nobita</div>`;
+                    this.recordLearningCommand('pwd');
                 } else if (cmd === 'cat') {
                     const file = MockFS.get('/home/nobita/Desktop/' + args[1]) || MockFS.get(args[1]);
-                    if (file) logs.innerHTML += `<div style="white-space:pre-wrap; color:#eee;">${file.content}</div>`;
-                    else logs.innerHTML += `<div style="color:#ff5555;">cat: ${args[1]}: No such file</div>`;
+                    if (file) {
+                        logs.innerHTML += `<div style="white-space:pre-wrap; color:#eee;">${escapeHTML(file.content)}</div>`;
+                        if ((args[1] || '').toLowerCase() === 'welcome.txt') this.recordLearningCommand('cat Welcome.txt');
+                    }
+                    else logs.innerHTML += `<div style="color:#ff5555;">cat: ${escapeHTML(args[1] || '')}: No such file</div>`;
+                } else if (cmd === 'mkdir') {
+                    const name = args[1];
+                    if (!name || name.includes('/') || name === '.' || name === '..') {
+                        logs.innerHTML += `<div style="color:#ffda75;">Usage: mkdir FOLDER_NAME (practice folders only)</div>`;
+                    } else {
+                        const path = `/home/nobita/${name}`;
+                        MockFS.save(`${path}/.keep`, '');
+                        logs.innerHTML += `<div style="color:#eee;">Created practice folder ${escapeHTML(name)}/</div>`;
+                        if (name === 'Projects' || name === 'projects') this.recordLearningCommand('mkdir Projects');
+                    }
+                } else if (cmd === 'cp') {
+                    const sourceName = args[1];
+                    const targetName = args[2];
+                    const source = sourceName && (MockFS.get('/home/nobita/Desktop/' + sourceName) || MockFS.get(sourceName));
+                    const folder = targetName && targetName.replace(/\/$/, '');
+                    const folderExists = folder && (folder === 'Projects' || folder === 'projects') && MockFS.get(`/home/nobita/${folder}/.keep`);
+                    if (!source || !folderExists) {
+                        logs.innerHTML += `<div style="color:#ffda75;">Usage: cp SOURCE_FILE EXISTING_FOLDER/ — check the name with ls and create the folder first.</div>`;
+                    } else {
+                        MockFS.save(`/home/nobita/${folder}/${source.name}`, source.content);
+                        logs.innerHTML += `<div style="color:#eee;">Copied ${escapeHTML(source.name)} into ${escapeHTML(folder)}/</div>`;
+                        if (source.name === 'Welcome.txt' && folder.toLowerCase() === 'projects') this.recordLearningCommand('cp Welcome.txt Projects/');
+                    }
                 } else if (cmd === 'dorasay' || cmd === 'cowsay') {
                     const msg = args.slice(1).join(' ') || 'Dorayaki is awesome!';
                     const bar = '─'.repeat(msg.length + 2);
                     logs.innerHTML += `<pre style="color:#fff; margin:4px 0;">┌${bar}┐
-│ ${msg} │
+│ ${escapeHTML(msg)} │
 └${bar}┘
    \\
     \\  (=^･ｪ･^=) 🔔</pre>`;
@@ -1122,7 +1280,7 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
  1452 nobita    20   0    890M   140M   4.5  0.9 0:18 anywhere-door
 </div>`;
                 } else if (cmd === 'echo') {
-                    logs.innerHTML += `<div style="color:#eee;">${args.slice(1).join(' ')}</div>`;
+                    logs.innerHTML += `<div style="color:#eee;">${escapeHTML(args.slice(1).join(' '))}</div>`;
                 } else if (cmd === 'dorayaki') {
                     logs.innerHTML += `<div style="color:#FFD60A;">🥞 Nom nom nom! Doraemon is very happy.</div>`;
                     audio.beep(880, 'triangle', 0.2, 0.1);
@@ -1137,7 +1295,7 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
                     ];
                     logs.innerHTML += `<div style="color:#8FD0FF;">🔔 ${gadgets[Math.floor(Math.random() * gadgets.length)]}</div>`;
                 } else {
-                    logs.innerHTML += `<div style="color:#ff6666;">bash: ${cmd}: command not found. Type 'help' for options.</div>`;
+                    logs.innerHTML += `<div style="color:#ff6666;">bash: ${escapeHTML(cmd)}: command not found. Type 'help' for options.</div>`;
                 }
                 el.scrollTop = el.scrollHeight;
             }
@@ -1174,7 +1332,7 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
                 const file = MockFS.get(filePath);
                 const item = document.createElement('div');
                 item.style.cssText = 'display:flex; flex-direction:column; align-items:center; cursor:pointer; padding:8px; border-radius:8px; text-align:center; font-size:11px;';
-                item.innerHTML = `<span style="font-size:28px;">📄</span><span style="margin-top:4px; word-break:break-word;">${file.name}</span>`;
+                item.innerHTML = `<span style="font-size:28px;">📄</span><span style="margin-top:4px; word-break:break-word;">${escapeHTML(file.name)}</span>`;
                 item.ondblclick = () => DoremonOS.launch('editor', filePath);
                 grid.appendChild(item);
             });
@@ -1196,14 +1354,14 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
 
         el.innerHTML = `
             <div style="height:36px; background:#0f3a66; border-bottom:1px solid #1f4d7e; display:flex; align-items:center; justify-content:space-between; padding:0 12px; font-size:12px;">
-                <div style="font-weight:600;">📝 ${file.name || 'Untitled'}</div>
+                <div style="font-weight:600;">📝 ${escapeHTML(file.name || 'Untitled')}</div>
                 <div style="display:flex; gap:8px;">
                     <button id="${el.id}-btn-preview" style="background:#1f4d7e; border:none; color:white; padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer;">Markdown Preview</button>
                     <button id="${el.id}-btn-save" style="background:var(--dora-blue); border:none; color:white; padding:4px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600;">Save</button>
                 </div>
             </div>
             <div style="flex:1; display:flex;">
-                <textarea id="${el.id}-textarea" style="flex:1; background:#0f2d4d; border:none; outline:none; color:#f0f0f0; padding:12px; font-family:'Ubuntu Mono', monospace; font-size:13px; resize:none; line-height:1.6;">${file.content}</textarea>
+                <textarea id="${el.id}-textarea" style="flex:1; background:#0f2d4d; border:none; outline:none; color:#f0f0f0; padding:12px; font-family:'Ubuntu Mono', monospace; font-size:13px; resize:none; line-height:1.6;">${escapeHTML(file.content)}</textarea>
                 <div id="${el.id}-preview" style="display:none; flex:1; background:#082038; border-left:1px solid #1f4d7e; padding:16px; overflow-y:auto; font-size:13px;"></div>
             </div>
             <div style="height:22px; background:#0f3a66; border-top:1px solid #1f4d7e; font-size:10px; color:#a9cdee; display:flex; align-items:center; justify-content:space-between; padding:0 12px;">
@@ -1233,7 +1391,7 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
         el.querySelector(`#${el.id}-btn-preview`).onclick = () => {
             if (preview.style.display === 'none') {
                 preview.style.display = 'block';
-                preview.innerHTML = textarea.value
+                preview.innerHTML = escapeHTML(textarea.value)
                     .replace(/^# (.*$)/gim, '<h2 style="color:var(--dora-blue); border-bottom:1px solid #1f4d7e; padding-bottom:4px;">$1</h2>')
                     .replace(/^## (.*$)/gim, '<h3 style="color:#ddd;">$1</h3>')
                     .replace(/^- (.*$)/gim, '<li>$1</li>')
@@ -1255,6 +1413,7 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
                 <span style="cursor:pointer;" onclick="DoremonOS.loadBrowserArticle('${el.id}', 'dora')">Doraemon</span>
                 <span style="cursor:pointer;" onclick="DoremonOS.loadBrowserArticle('${el.id}', 'news')">Dorayaki Daily</span>
                 <span style="cursor:pointer;" onclick="DoremonOS.loadBrowserArticle('${el.id}', 'fujio')">Fujiko F. Fujio</span>
+                <span style="margin-left:auto; font-size:10px; color:#8fb8dc;">Offline sample pages</span>
             </div>
             <div id="${el.id}-view" style="flex:1; overflow-y:auto; padding:24px; background:#0a2542; color:#eee;"></div>
         `;
@@ -1631,6 +1790,7 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
     toggleDarkMode() {
         this.settings.darkMode = !this.settings.darkMode;
         document.getElementById('qs-dark-status').innerText = this.settings.darkMode ? 'On' : 'Off';
+        this.setTheme(this.settings.darkMode ? 'dark' : 'light');
     },
 
     toggleNightLight() {
@@ -1657,7 +1817,12 @@ Mem[||||||||||||           28.1%]   Uptime: 02:14:28
     },
 
     setTheme(t) {
-        // Toggle theme styling
+        const desktop = document.getElementById('desktop');
+        const isLight = t === 'light';
+        desktop.classList.toggle('light-theme', isLight);
+        this.settings.darkMode = !isLight;
+        const status = document.getElementById('qs-dark-status');
+        if (status) status.innerText = isLight ? 'Off' : 'On';
     },
 
     lockScreen() {

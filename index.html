@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DoremonOS</title>
+    <meta name="theme-color" content="#0A9BE8">
+    <meta name="description" content="DoremonOS: a Doraemon-inspired desktop environment in a single HTML file, with a gadget dock, draggable windows and a pocketful of apps.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --dora-blue: #0A9BE8;
+            --dora-night: #0B2F57;
+            --dora-deep: #0B3C6E;
+            --dora-red: #E8112D;
+            --dora-yellow: #FFD60A;
+            --dora-header: #14568F;
+            --dora-glass: rgba(11, 60, 110, 0.55);
+            --dora-glass-border: rgba(255, 255, 255, 0.18);
+            --font-dora: 'Fredoka', 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'Ubuntu Mono', monospace;
+        }
+
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: var(--font-dora);
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: var(--dora-night);
+            color: #ffffff;
+        }
+
+        /* Desktop Canvas */
+        #desktop {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background: radial-gradient(ellipse 240px 64px at 18% 24%, rgba(255,255,255,0.95), rgba(255,255,255,0) 70%), radial-gradient(ellipse 320px 84px at 74% 16%, rgba(255,255,255,0.9), rgba(255,255,255,0) 70%), radial-gradient(ellipse 280px 72px at 58% 66%, rgba(255,255,255,0.75), rgba(255,255,255,0) 70%), linear-gradient(180deg, #67CBFF 0%, #1E9BE9 55%, #0B63B0 100%);
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+
+        /* Top Bar (red collar line) */
+        #top-bar {
+            height: 28px;
+            background: rgba(11, 60, 110, 0.97);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 9990;
+            border-bottom: 3px solid var(--dora-red);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+        }
+
+        .top-btn {
+            padding: 2px 10px;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .top-btn:hover { background: rgba(255, 255, 255, 0.15); }
+        .top-btn.active { background: var(--dora-yellow); color: #0B2F57; }
+
+        /* Left Gadget Dock */
+        #dock {
+            position: absolute;
+            left: 0;
+            top: 28px;
+            bottom: 0;
+            width: 60px;
+            background: rgba(11, 60, 110, 0.72);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            z-index: 9980;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        #dock-apps {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+            width: 100%;
+            align-items: center;
+        }
+
+        .dock-item {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 22px;
+            transition: all 0.15s;
+            border: 1px solid transparent;
+        }
+        .dock-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+        .dock-item.active {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .dock-pip {
+            position: absolute;
+            left: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 2px;
+            transition: all 0.2s;
+        }
+        .dock-item.active .dock-pip {
+            height: 18px;
+            background: var(--dora-yellow);
+            box-shadow: 0 0 8px var(--dora-yellow);
+        }
+
+        /* Tooltip */
+        .dock-tooltip {
+            position: absolute;
+            left: 68px;
+            background: rgba(8, 40, 76, 0.96);
+            backdrop-filter: blur(10px);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #ffffff;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 99999;
+        }
+        .dock-item:hover .dock-tooltip { opacity: 1; }
+
+        /* Desktop Shortcuts */
+        #desktop-icons {
+            position: absolute;
+            top: 40px;
+            left: 74px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 10;
+        }
+        .desktop-shortcut {
+            width: 80px;
+            padding: 8px 4px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            text-align: center;
+            transition: 0.15s;
+            border: 1px solid transparent;
+        }
+        .desktop-shortcut:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .desktop-shortcut.selected {
+            background: rgba(10, 155, 232, 0.3);
+            border-color: var(--dora-blue);
+        }
+        .desktop-shortcut .icon { font-size: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+        .desktop-shortcut .label {
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 4px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            color: white;
+            word-break: break-word;
+        }
+
+        /* Window Styling */
+        .window {
+            position: absolute;
+            background: #12335a;
+            border-radius: 10px 10px 8px 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            min-width: 320px;
+            min-height: 220px;
+            transition: box-shadow 0.15s;
+        }
+        .window.focused {
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(10, 155, 232, 0.4);
+        }
+        .window.maximized {
+            top: 28px !important;
+            left: 60px !important;
+            width: calc(100vw - 60px) !important;
+            height: calc(100vh - 28px) !important;
+            border-radius: 0 !important;
+        }
+        .window.snapped-left {
+            top: 28px !important;
+            left: 60px !important;
+            width: calc((100vw - 60px) / 2) !important;
+            height: calc(100vh - 28px) !important;
+            border-radius: 0 !important;
+        }
+        .window.snapped-right {
+            top: 28px !important;
+            left: calc(60px + (100vw - 60px) / 2) !important;
+            width: calc((100vw - 60px) / 2) !important;
+            height: calc(100vh - 28px) !important;
+            border-radius: 0 !important;
+        }
+        .window.minimized {
+            display: none !important;
+        }
+
+        /* Window Header */
+        .win-header {
+            height: 34px;
+            background: var(--dora-header);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            cursor: default;
+            font-size: 12px;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(0,0,0,0.4);
+            color: #dcdcdc;
+        }
+        .window.focused .win-header {
+            background: #0A8AD8;
+            color: #ffffff;
+        }
+        .win-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .win-btn {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            transition: 0.15s;
+        }
+        .win-btn:hover { background: rgba(255, 255, 255, 0.35); }
+        .win-btn.close { background: rgba(232, 17, 45, 0.9); }
+        .win-btn.close:hover { background: #E8112D; }
+
+        /* Window Content */
+        .win-content {
+            flex: 1;
+            overflow: auto;
+            background: #0f2d4d;
+            color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* 8-Way Window Resize Handles */
+        .resizer { position: absolute; }
+        .resizer.r-e { top: 0; right: 0; width: 6px; bottom: 0; cursor: e-resize; }
+        .resizer.r-w { top: 0; left: 0; width: 6px; bottom: 0; cursor: w-resize; }
+        .resizer.r-s { left: 0; right: 0; bottom: 0; height: 6px; cursor: s-resize; }
+        .resizer.r-n { left: 0; right: 0; top: 0; height: 6px; cursor: n-resize; }
+        .resizer.r-se { right: 0; bottom: 0; width: 12px; height: 12px; cursor: se-resize; }
+        .resizer.r-sw { left: 0; bottom: 0; width: 12px; height: 12px; cursor: sw-resize; }
+        .resizer.r-ne { right: 0; top: 0; width: 12px; height: 12px; cursor: ne-resize; }
+        .resizer.r-nw { left: 0; top: 0; width: 12px; height: 12px; cursor: nw-resize; }
+
+        /* Popover Panels (Calendar & Quick Settings) */
+        .dora-popover {
+            position: absolute;
+            background: rgba(10, 52, 96, 0.96);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+            padding: 16px;
+            z-index: 9995;
+            display: none;
+            color: #ffffff;
+        }
+        .dora-popover.open { display: block; }
+
+        #calendar-popover {
+            top: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+        }
+
+        #quick-settings-popover {
+            top: 36px;
+            right: 12px;
+            width: 290px;
+        }
+
+        /* Activities Overlay */
+        #activities-overlay {
+            position: fixed;
+            inset: 0;
+            top: 28px;
+            background: rgba(6, 48, 92, 0.86);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 40px;
+            z-index: 9989;
+            overflow-y: auto;
+        }
+        #activities-overlay.open { display: flex; }
+
+        .search-box {
+            width: 100%;
+            max-width: 520px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 9999px;
+            padding: 10px 20px;
+            font-size: 14px;
+            color: #ffffff;
+            outline: none;
+            margin-bottom: 30px;
+            transition: all 0.2s;
+        }
+        .search-box:focus {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: var(--dora-blue);
+            box-shadow: 0 0 15px rgba(10, 155, 232, 0.4);
+        }
+
+        /* Context Menu */
+        #context-menu {
+            position: fixed;
+            background: rgba(10, 52, 96, 0.97);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 6px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+            display: none;
+            flex-direction: column;
+            z-index: 99999;
+            width: 190px;
+            font-size: 12px;
+        }
+        .context-item {
+            padding: 7px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #e5e5e5;
+            transition: 0.1s;
+        }
+        .context-item:hover {
+            background: var(--dora-blue);
+            color: #ffffff;
+        }
+        .context-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 4px 0;
+        }
+
+        /* Snap Phantom Ghost Box */
+        #snap-ghost {
+            position: fixed;
+            background: rgba(10, 155, 232, 0.2);
+            border: 2px solid var(--dora-blue);
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 9985;
+            display: none;
+        }
+
+        /* Night Light Filter */
+        #night-light-overlay {
+            position: fixed;
+            inset: 0;
+            background: #ff8800;
+            opacity: 0;
+            mix-blend-mode: multiply;
+            pointer-events: none;
+            z-index: 99998;
+            transition: opacity 0.3s;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+
+        /* Keep the desktop usable on narrow screens while preserving the OS layout. */
+        .window { min-width: min(320px, calc(100vw - 60px)); }
+        @media (max-width: 640px) {
+            .window:not(.maximized):not(.snapped-left):not(.snapped-right) {
+                left: 60px !important;
+                top: 36px !important;
+                width: calc(100vw - 60px) !important;
+                height: calc(100vh - 36px) !important;
+                min-width: 0;
+            }
+            #desktop-icons { left: 66px; gap: 6px; }
+            .desktop-shortcut { width: 66px; padding: 4px 2px; }
+            .desktop-shortcut .icon { font-size: 25px; }
+            #activities-overlay { padding: 18px 12px; }
+        }
+        #desktop.light-theme { background: linear-gradient(180deg,#e8f5ff 0%,#b9e3fb 100%) !important; color:#17324d; }
+        #desktop.light-theme #top-bar { background:rgba(21,83,132,.96); }
+        #desktop.light-theme #dock { background:rgba(21,83,132,.82); }
+        #desktop.light-theme .window { background:#eaf4fb; color:#17324d; }
+        #desktop.light-theme .win-header { background:#b9dcf3; color:#17324d; }
+        #desktop.light-theme .window.focused .win-header { background:#168dd1; color:#fff; }
+        #desktop.light-theme .win-content { background:#f5faff; color:#17324d; }
+    </style>
+</head>
+<body>
+
+<div id="desktop">
+    <!-- Top Bar -->
+    <div id="top-bar">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div class="top-btn" id="btn-activities" onclick="DoremonOS.toggleActivities()">
+                <b>🔔 Gadgets</b>
+            </div>
+            <span id="active-app-label" style="color:#dcdcdc; font-weight:600; margin-left:4px;"></span>
+        </div>
+
+        <div class="top-btn" onclick="DoremonOS.toggleCalendar()">
+            <span id="clock-display">Wed Nov 4 10:00</span>
+        </div>
+
+        <div class="top-btn" onclick="DoremonOS.toggleQuickSettings()" style="gap:10px;">
+            <span id="tray-wifi">📶</span>
+            <span id="tray-sound">🔊</span>
+            <span>🔋</span>
+        </div>
+    </div>
+
+    <!-- Left Gadget Dock -->
+    <div id="dock">
+        <div id="dock-apps"></div>
+        <div class="dock-item" onclick="DoremonOS.toggleActivities()" title="All Gadgets" style="font-size:24px;">
+            ⠿
+            <div class="dock-tooltip">All Gadgets</div>
+        </div>
+    </div>
+
+    <!-- Desktop Icons -->
+    <div id="desktop-icons">
+        <div class="desktop-shortcut" onclick="DoremonOS.selectShortcut(this)" ondblclick="DoremonOS.launch('files', '/home/nobita')">
+            <div class="icon">🏠</div>
+            <div class="label">Nobita's Room</div>
+        </div>
+        <div class="desktop-shortcut" onclick="DoremonOS.selectShortcut(this)" ondblclick="DoremonOS.launch('editor', 'Welcome.txt')">
+            <div class="icon">📄</div>
+            <div class="label">Welcome.txt</div>
+        </div>
+        <div class="desktop-shortcut" onclick="DoremonOS.selectShortcut(this)" ondblclick="DoremonOS.launch('terminal')">
+            <div class="icon">💻</div>
+            <div class="label">Terminal</div>
+        </div>
+        <div class="desktop-shortcut" onclick="DoremonOS.selectShortcut(this)" ondblclick="DoremonOS.launch('files', '/home/nobita/Documents')">
+            <div class="icon">📁</div>
+            <div class="label">Documents</div>
+        </div>
+        <div class="desktop-shortcut" onclick="DoremonOS.selectShortcut(this)" ondblclick="DoremonOS.launch('learn')">
+            <div class="icon">🐧</div>
+            <div class="label">Linux Learning</div>
+        </div>
+    </div>
+
+    <!-- Snap Ghost Indicator -->
+    <div id="snap-ghost"></div>
+
+    <!-- Night Light Tint Overlay -->
+    <div id="night-light-overlay"></div>
+
+    <!-- Calendar Popover -->
+    <div id="calendar-popover" class="dora-popover">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px; margin-bottom:12px;">
+            <div>
+                <div style="font-size:15px; font-weight:700;" id="cal-month-year">November 2026</div>
+                <div style="font-size:11px; color:#a9cdee;" id="cal-weekday-day">Wednesday, November 4</div>
+            </div>
+            <button onclick="DoremonOS.launch('calendar')" style="padding:4px 10px; background:var(--dora-blue); border:none; color:white; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600;">Open Calendar</button>
+        </div>
+        <div id="mini-calendar" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; text-align:center; font-size:11px;"></div>
+        <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1); font-size:11px;">
+            <div style="color:#a9cdee; margin-bottom:4px;">Notifications</div>
+            <div style="background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+                <b>Doraemon</b>
+                <div style="color:#bcd8f0; font-size:10px; margin-top:2px;">All gadgets are working perfectly.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Settings Popover -->
+    <div id="quick-settings-popover" class="dora-popover">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+            <div id="qs-wifi" onclick="DoremonOS.toggleWifi()" style="background:rgba(255,255,255,0.08); padding:10px; border-radius:10px; cursor:pointer; font-size:12px;">
+                <div style="font-weight:600;">📶 Wi-Fi</div>
+                <div style="font-size:10px; color:#bcd8f0;" id="qs-wifi-status">Connected</div>
+            </div>
+            <div id="qs-dark" onclick="DoremonOS.toggleDarkMode()" style="background:rgba(255,255,255,0.08); padding:10px; border-radius:10px; cursor:pointer; font-size:12px;">
+                <div style="font-weight:600;">🌙 Night Mode</div>
+                <div style="font-size:10px; color:#bcd8f0;" id="qs-dark-status">On</div>
+            </div>
+            <div id="qs-night" onclick="DoremonOS.toggleNightLight()" style="background:rgba(255,255,255,0.08); padding:10px; border-radius:10px; cursor:pointer; font-size:12px;">
+                <div style="font-weight:600;">👁️ Night Light</div>
+                <div style="font-size:10px; color:#bcd8f0;" id="qs-night-status">Off</div>
+            </div>
+            <div onclick="DoremonOS.launch('settings')" style="background:rgba(255,255,255,0.08); padding:10px; border-radius:10px; cursor:pointer; font-size:12px;">
+                <div style="font-weight:600;">⚙️ Settings</div>
+                <div style="font-size:10px; color:#bcd8f0;">Control Center</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+                <span>Volume</span>
+                <span id="volume-val">75%</span>
+            </div>
+            <input type="range" id="volume-slider" min="0" max="100" value="75" oninput="DoremonOS.setVolume(this.value)" style="width:100%; accent-color:var(--dora-blue);">
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+                <span>Brightness</span>
+                <span id="brightness-val">100%</span>
+            </div>
+            <input type="range" id="brightness-slider" min="30" max="100" value="100" oninput="DoremonOS.setBrightness(this.value)" style="width:100%; accent-color:var(--dora-blue);">
+        </div>
+
+        <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+            <button onclick="DoremonOS.launch('settings')" style="background:none; border:none; color:white; font-size:16px; cursor:pointer;" title="Settings">⚙️</button>
+            <button onclick="DoremonOS.lockScreen()" style="background:none; border:none; color:white; font-size:16px; cursor:pointer;" title="Lock Screen">🔒</button>
+            <button onclick="DoremonOS.powerOffDialog()" style="background:none; border:none; color:#ff5555; font-size:16px; cursor:pointer;" title="Power Off">⏻</button>
+        </div>
+    </div>
+
+    <!-- Activities Overlay -->
+    <div id="activities-overlay" onclick="DoremonOS.toggleActivities()">
+        <input type="text" id="activities-search" class="search-box" placeholder="Search gadgets, files, or settings..." onclick="event.stopPropagation()" oninput="DoremonOS.onSearch(this.value)">
+
+        <!-- Open Windows Expose Grid -->
+        <div style="width:100%; max-width:960px; margin-bottom:30px;" onclick="event.stopPropagation()">
+            <div style="font-size:12px; font-weight:700; color:#a9cdee; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; text-align:center;">Open Windows</div>
+            <div id="activities-windows-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;"></div>
+        </div>
+
+        <!-- All Applications Grid -->
+        <div style="width:100%; max-width:960px;" onclick="event.stopPropagation()">
+            <div style="font-size:12px; font-weight:700; color:#a9cdee; text-transform:uppercase; letter-spacing:1px; margin-bottom:16px; text-align:center;">Doraemon's Gadgets</div>
+            <div id="activities-app-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:20px; justify-items:center;"></div>
+        </div>
+    </div>
+
+    <!-- Desktop Context Menu -->
+    <div id="context-menu">
+        <div class="context-item" onclick="DoremonOS.newFolder()">📁 New Folder</div>
+        <div class="context-item" onclick="DoremonOS.newDocument()">📄 New Document</div>
+        <div class="context-divider"></div>
+        <div class="context-item" onclick="DoremonOS.launch('terminal')">💻 Open in Terminal</div>
+        <div class="context-divider"></div>
+        <div class="context-item" onclick="DoremonOS.launch('settings')">🖼️ Change Background...</div>
+        <div class="context-item" onclick="DoremonOS.launch('settings')">⚙️ Display Settings</div>
+    </div>
+</div>
+
+<script type="module">
+/* =========================================================================
+   DOREMONOS - MODULAR RUNTIME (SINGLE-FILE CORE)
+   ========================================================================= */
+
+// 1. Virtual File System
+const MockFS = {
+    files: {
+        '/home/nobita/Desktop/Welcome.txt': { name: 'Welcome.txt', type: 'file', content: `Welcome to DoremonOS 1.0 - the Gadget Edition!
+
+Pull anything out of the 4D Pocket:
+- Gadget Terminal with gadget, dorayaki, dorasay, neofetch, htop, ls, cat, echo, clear
+- 4D Pocket Files: create, edit and browse files
+- Anywhere Door Browser with Doraemon, Dorayaki Daily and Fujiko F. Fujio pages
+- Memory Bread Notes: text editor with markdown preview and save
+- Calculator, Time Machine Calendar and Gian Concert music player
+- Gadget Settings: sky, sunset, night and Anywhere Door wallpapers
+- Mouse Panic: because even robot cats have fears
+
+Windows: drag to a screen edge to snap, resize from any side, double-click a title bar to maximize.
+` },
+        '/home/nobita/Desktop/Notes.md': { name: 'Notes.md', type: 'file', content: `# DoremonOS Notes
+- Pocket capacity: infinite (4th dimension)
+- Favorite snack: dorayaki
+- State: LocalStorage synced
+` },
+        '/home/nobita/Documents/System_Spec.txt': { name: 'System_Spec.txt', type: 'file', content: 'Architecture: x86_64\nMemory: 16.0 GiB\nProcessor: Virtual Octa-Core @ 3.4GHz\nCompositor: HTML5 Pocket Window Engine\n' },
+        '/home/nobita/Pictures/Dorayaki.svg': { name: 'Dorayaki.svg', type: 'file', content: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><rect width="300" height="200" fill="#67CBFF"/><ellipse cx="150" cy="118" rx="95" ry="38" fill="#C9782B"/><ellipse cx="150" cy="100" rx="95" ry="38" fill="#7A1F2B"/><ellipse cx="150" cy="84" rx="95" ry="38" fill="#E09A3E"/><text x="150" y="176" fill="#fff" text-anchor="middle" font-family="Fredoka, sans-serif" font-size="16" font-weight="bold">Dorayaki</text></svg>' },
+    },
+    list(dir) {
+        return Object.keys(this.files).filter(k => k.startsWith(dir) && k !== dir);
+    },
+    get(path) {
+        return this.files[path];
+    },
+    save(path, content) {
+        const name = path.split('/').pop();
+        this.files[path] = { name, type: 'file', content };
+        localStorage.setItem('doremonos_mockfs', JSON.stringify(this.files));
+    },
+    remove(path) {
+        delete this.files[path];
+        localStorage.setItem('doremonos_mockfs', JSON.stringify(this.files));
+    }
+};
+
+// Render user-entered terminal text as text, never as executable markup.
+const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[char]));
+
+// 2. Web Audio Synthesizer (for sound effects and Gian Concert ambient tracks)
+class AudioSynth {
+    constructor() {
+        this.ctx = null;
+        this.timer = null;
+        this.isPlaying = false;
+    }
+    init() {
+        if (!this.ctx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    }
+    beep(freq = 440, type = 'sine', duration = 0.1, vol = 0.15) {
+        try {
+            this.init();
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {}
+    }
+    startMusic(onTick) {
+        this.init();
+        if (!this.ctx) return;
+        this.isPlaying = true;
+        const scale = [220, 261.63, 293.66, 329.63, 392, 440];
+        let idx = 0;
+        this.timer = setInterval(() => {
+            if (!this.isPlaying) return;
+            const freq = scale[idx % scale.length];
+            idx = (idx + Math.floor(Math.random() * 2) + 1) % scale.length;
+            this.beep(freq, 'triangle', 0.8, 0.08);
+            if (onTick) onTick(freq);
+        }, 500);
+    }
+    stopMusic() {
+        this.isPlaying = false;
+        if (this.timer) clearInterval(this.timer);
+    }
+}
+const audio = new AudioSynth();
+
+// 3. Application Registry
+const APPS = {
+    learn: { title: 'Linux Learning Path', icon: '🐧', width: 720, height: 500 },
+    terminal: { title: 'Gadget Terminal', icon: '💻', width: 680, height: 440 },
+    files: { title: '4D Pocket Files', icon: '🎒', width: 780, height: 500 },
+    browser: { title: 'Anywhere Door Browser', icon: '🚪', width: 840, height: 540 },
+    editor: { title: 'Memory Bread Notes', icon: '🍞', width: 720, height: 480 },
+    calc: { title: 'Calculator', icon: '🧮', width: 360, height: 480 },
+    calendar: { title: 'Time Machine Calendar', icon: '⏳', width: 720, height: 480 },
+    music: { title: 'Gian Concert', icon: '🎤', width: 640, height: 420 },
+    settings: { title: 'Gadget Settings', icon: '⚙️', width: 760, height: 500 },
+    software: { title: 'Gadget Store', icon: '🛍️', width: 760, height: 500 },
+    mines: { title: 'Mouse Panic', icon: '🐭', width: 380, height: 480 }
+};
+
+// 4. DoremonOS Master Controller
+window.DoremonOS = {
+    zIndex: 100,
+    windows: {},
+    activeWinId: null,
+    cascadeCount: 0,
+    settings: {
+        darkMode: true,
+        nightLight: false,
+        wifi: true,
+        volume: 75,
+        brightness: 100,
+        wallpaper: 'radial-gradient(ellipse 240px 64px at 18% 24%, rgba(255,255,255,0.95), rgba(255,255,255,0) 70%), radial-gradient(ellipse 320px 84px at 74% 16%, rgba(255,255,255,0.9), rgba(255,255,255,0) 70%), radial-gradient(ellipse 280px 72px at 58% 66%, rgba(255,255,255,0.75), rgba(255,255,255,0) 70%), linear-gradient(180deg, #67CBFF 0%, #1E9BE9 55%, #0B63B0 100%)'
+    },
+    learningProgress: new Set(),
+
+    init() {
+        this.renderDock();
+        this.renderMiniCalendar();
+        this.updateClock();
+        setInterval(() => this.updateClock(), 1000);
+
+        // Right click desktop context menu
+        document.getElementById('desktop').addEventListener('contextmenu', (e) => {
+            if (e.target.id === 'desktop' || e.target.id === 'desktop-icons') {
+                e.preventDefault();
+                this.openContextMenu(e.clientX, e.clientY);
+            }
+        });
+        document.addEventListener('click', () => this.closeContextMenu());
+
+        // Launch default welcome windows
+        this.launch('terminal');
+        this.launch('files');
+        this.launch('learn');
+    },
+
+    updateClock() {
+        const now = new Date();
+        const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+        const str = now.toLocaleDateString('en-US', options).replace(/,/g, '');
+        document.getElementById('clock-display').innerText = str;
+    },
+
+    renderDock() {
+        const container = document.getElementById('dock-apps');
+        container.innerHTML = '';
+        Object.entries(APPS).forEach(([id, app]) => {
+            const item = document.createElement('div');
+            item.className = 'dock-item';
+            item.id = `dock-${id}`;
+            item.innerHTML = `
+                ${app.icon}
+                <div class="dock-pip"></div>
+                <div class="dock-tooltip">${app.title}</div>
+            `;
+            item.onclick = () => this.handleDockClick(id);
+            container.appendChild(item);
+        });
+    },
+
+    handleDockClick(appId) {
+        const existingWinId = Object.keys(this.windows).find(k => this.windows[k].appId === appId);
+        if (!existingWinId) {
+            this.launch(appId);
+        } else {
+            const winEl = document.getElementById(existingWinId);
+            if (winEl.classList.contains('minimized')) {
+                winEl.classList.remove('minimized');
+                this.focusWindow(existingWinId);
+            } else if (this.activeWinId === existingWinId) {
+                winEl.classList.add('minimized');
+                this.activeWinId = null;
+                this.updateDockIndicators();
+            } else {
+                this.focusWindow(existingWinId);
+            }
+        }
+    },
+
+    updateDockIndicators() {
+        Object.keys(APPS).forEach(appId => {
+            const dockItem = document.getElementById(`dock-${appId}`);
+            if (!dockItem) return;
+            const hasOpen = Object.values(this.windows).some(w => w.appId === appId && !w.el.classList.contains('minimized'));
+            const isTop = this.activeWinId && this.windows[this.activeWinId]?.appId === appId;
+            dockItem.classList.toggle('active', isTop);
+            dockItem.querySelector('.dock-pip').style.display = hasOpen ? 'block' : 'none';
+        });
+        const activeMeta = this.activeWinId ? APPS[this.windows[this.activeWinId].appId] : null;
+        document.getElementById('active-app-label').innerText = activeMeta ? activeMeta.title : '';
+    },
+
+    launch(appId, param = null) {
+        const app = APPS[appId];
+        if (!app) return;
+
+        // If window already open, focus it
+        const openId = Object.keys(this.windows).find(k => this.windows[k].appId === appId);
+        if (openId && !param) {
+            const el = document.getElementById(openId);
+            el.classList.remove('minimized');
+            this.focusWindow(openId);
+            return;
+        }
+
+        const winId = 'win-' + appId + '-' + Date.now();
+        const offset = (this.cascadeCount % 8) * 26;
+        this.cascadeCount++;
+
+        const left = Math.min(window.innerWidth - app.width - 20, 80 + offset);
+        const top = Math.min(window.innerHeight - app.height - 40, 50 + offset);
+
+        const win = document.createElement('div');
+        win.className = 'window';
+        win.id = winId;
+        win.style.left = left + 'px';
+        win.style.top = top + 'px';
+        win.style.width = app.width + 'px';
+        win.style.height = app.height + 'px';
+        win.style.zIndex = ++this.zIndex;
+
+        win.innerHTML = `
+            <div class="win-header">
+                <span>${app.icon} ${app.title}</span>
+                <div class="win-controls">
+                    <div class="win-btn" onclick="DoremonOS.minimizeWindow('${winId}')" title="Minimize">−</div>
+                    <div class="win-btn" onclick="DoremonOS.toggleMaximize('${winId}')" title="Maximize">□</div>
+                    <div class="win-btn close" onclick="DoremonOS.closeWindow('${winId}')" title="Close">✕</div>
+                </div>
+            </div>
+            <div class="win-content" id="${winId}-content"></div>
+
+            <!-- Resizers -->
+            <div class="resizer r-e" onmousedown="DoremonOS.initResize('${winId}', 'e', event)"></div>
+            <div class="resizer r-w" onmousedown="DoremonOS.initResize('${winId}', 'w', event)"></div>
+            <div class="resizer r-s" onmousedown="DoremonOS.initResize('${winId}', 's', event)"></div>
+            <div class="resizer r-n" onmousedown="DoremonOS.initResize('${winId}', 'n', event)"></div>
+            <div class="resizer r-se" onmousedown="DoremonOS.initResize('${winId}', 'se', event)"></div>
+            <div class="resizer r-sw" onmousedown="DoremonOS.initResize('${winId}', 'sw', event)"></div>
+            <div class="resizer r-ne" onmousedown="DoremonOS.initResize('${winId}', 'ne', event)"></div>
+            <div class="resizer r-nw" onmousedown="DoremonOS.initResize('${winId}', 'nw', event)"></div>
+        `;
+
+        document.getElementById('desktop').appendChild(win);
+        this.windows[winId] = { id: winId, appId, el: win };
+
+        // Mount specific app content
+        this.renderAppContent(winId, appId, param);
+
+        // Dragging & Snapping logic
+        const header = win.querySelector('.win-header');
+        header.onmousedown = (e) => this.initDrag(winId, e);
+        header.ondblclick = () => this.toggleMaximize(winId);
+
+        win.onmousedown = () => this.focusWindow(winId);
+
+        this.focusWindow(winId);
+        audio.beep(520, 'sine', 0.1, 0.1);
+    },
+
+    focusWindow(winId) {
+        Object.keys(this.windows).forEach(id => {
+            const w = document.getElementById(id);
+            if (w) w.classList.remove('focused');
+        });
+        const target = document.getElementById(winId);
+        if (target) {
+            target.style.zIndex = ++this.zIndex;
+            target.classList.add('focused');
+            this.activeWinId = winId;
+            this.updateDockIndicators();
+        }
+    },
+
+    closeWindow(winId) {
+        const el = document.getElementById(winId);
+        if (el) el.remove();
+        delete this.windows[winId];
+        audio.beep(300, 'sine', 0.1, 0.1);
+        const remaining = Object.keys(this.windows);
+        if (remaining.length > 0) {
+            this.focusWindow(remaining[remaining.length - 1]);
+        } else {
+            this.activeWinId = null;
+            this.updateDockIndicators();
+        }
+    },
+
+    minimizeWindow(winId) {
+        const el = document.getElementById(winId);
+        if (el) el.classList.add('minimized');
+        this.activeWinId = null;
+        this.updateDockIndicators();
+    },
+
+    toggleMaximize(winId) {
+        const el = document.getElementById(winId);
+        if (!el) return;
+        el.classList.remove('snapped-left', 'snapped-right');
+        el.classList.toggle('maximized');
+        this.focusWindow(winId);
+    },
+
+    initDrag(winId, e) {
+        if (e.target.closest('.win-controls')) return;
+        const win = document.getElementById(winId);
+        if (win.classList.contains('maximized')) return;
+
+        this.focusWindow(winId);
+        const shiftX = e.clientX - win.offsetLeft;
+        const shiftY = e.clientY - win.offsetTop;
+        const ghost = document.getElementById('snap-ghost');
+
+        const move = (ev) => {
+            let left = ev.pageX - shiftX;
+            let top = Math.max(28, ev.pageY - shiftY);
+            win.style.left = left + 'px';
+            win.style.top = top + 'px';
+
+            // Snap preview ghost
+            if (ev.clientX < 15) {
+                ghost.style.display = 'block';
+                ghost.style.left = '60px';
+                ghost.style.top = '28px';
+                ghost.style.width = 'calc((100vw - 60px) / 2)';
+                ghost.style.height = 'calc(100vh - 28px)';
+            } else if (ev.clientX > window.innerWidth - 15) {
+                ghost.style.display = 'block';
+                ghost.style.left = 'calc(60px + (100vw - 60px) / 2)';
+                ghost.style.top = '28px';
+                ghost.style.width = 'calc((100vw - 60px) / 2)';
+                ghost.style.height = 'calc(100vh - 28px)';
+            } else {
+                ghost.style.display = 'none';
+            }
+        };
+
+        const stop = (ev) => {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', stop);
+            ghost.style.display = 'none';
+
+            if (ev.clientX < 15) {
+                win.classList.add('snapped-left');
+            } else if (ev.clientX > window.innerWidth - 15) {
+                win.classList.add('snapped-right');
+            }
+        };
+
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', stop);
+    },
+
+    initResize(winId, dir, e) {
+        e.stopPropagation();
+        e.preventDefault();
+        const win = document.getElementById(winId);
+        if (win.classList.contains('maximized')) return;
+
+        this.focusWindow(winId);
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startW = parseInt(win.style.width, 10);
+        const startH = parseInt(win.style.height, 10);
+        const startL = win.offsetLeft;
+        const startT = win.offsetTop;
+
+        const move = (ev) => {
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+            if (dir.includes('e')) win.style.width = Math.max(300, startW + dx) + 'px';
+            if (dir.includes('s')) win.style.height = Math.max(200, startH + dy) + 'px';
+            if (dir.includes('w')) {
+                const nw = startW - dx;
+                if (nw >= 300) { win.style.width = nw + 'px'; win.style.left = startL + dx + 'px'; }
+            }
+            if (dir.includes('n')) {
+                const nh = startH - dy;
+                if (nh >= 200) { win.style.height = nh + 'px'; win.style.top = Math.max(28, startT + dy) + 'px'; }
+            }
+        };
+
+        const stop = () => {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', stop);
+        };
+
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', stop);
+    },
+
+    // 5. App Renderers
+    renderAppContent(winId, appId, param) {
+        const container = document.getElementById(`${winId}-content`);
+        switch(appId) {
+            case 'terminal':
+                this.renderTerminal(container);
+                break;
+            case 'learn':
+                this.renderLearningPath(container);
+                break;
+            case 'files':
+                this.renderFiles(container, param || '/home/nobita');
+                break;
+            case 'browser':
+                this.renderBrowser(container);
+                break;
+            case 'editor':
+                this.renderEditor(container, param);
+                break;
+            case 'calc':
+                this.renderCalculator(container);
+                break;
+            case 'calendar':
+                this.renderCalendarApp(container);
+                break;
+            case 'music':
+                this.renderMusic(container);
+                break;
+            case 'settings':
+                this.renderSettings(container);
+                break;
+            case 'software':
+                this.renderSoftware(container);
+                break;
+            case 'mines':
+                this.renderMines(container);
+                break;
+        }
+    },
+
+    renderLearningPath(el) {
+        el.innerHTML = `
+            <div style="height:100%; overflow:auto; padding:22px; background:linear-gradient(145deg,#0f2d4d,#15436b); color:#f0f7ff;">
+                <div style="max-width:680px; margin:0 auto;">
+                    <div style="font-size:11px; color:#a9cdee; text-transform:uppercase; letter-spacing:1px;">Beginner learning path · Mission 1</div>
+                    <h2 style="margin:6px 0; font-size:24px;">Make a home for your project</h2>
+                    <p style="margin:0 0 16px; color:#c7dbee; line-height:1.55;">Practice a few everyday Linux commands in a safe simulator. These commands only change DoremonOS’s sample files; they never run on your computer.</p>
+                    <div style="height:8px; background:#0a2542; border-radius:8px; overflow:hidden; margin:14px 0 6px;"><div id="learn-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#0a9be8,#74dcbd); transition:width .2s;"></div></div>
+                    <div id="learn-progress-label" style="font-size:11px; color:#a9cdee; text-align:right;">0 of 5 steps done</div>
+                    <div id="learn-steps" style="display:grid; gap:9px; margin-top:14px;"></div>
+                    <div style="margin-top:16px; padding:13px 14px; border-radius:10px; background:rgba(10,37,66,.8); border:1px solid rgba(255,255,255,.12);">
+                        <div style="font-weight:700; color:#ffda75; margin-bottom:4px;">💡 Beginner tip</div>
+                        <div id="learn-tip" style="font-size:12px; color:#d5e5f3; line-height:1.55;">Commands are small instructions. Try one, read the result, and change nothing on your real device.</div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+                        <button onclick="DoremonOS.resetLearningPath()" style="padding:7px 11px; border-radius:7px; border:1px solid #47749b; background:#1a4266; color:white; cursor:pointer;">Reset progress</button>
+                        <button onclick="DoremonOS.launch('terminal')" style="padding:7px 11px; border-radius:7px; border:0; background:#0a9be8; color:white; cursor:pointer; font-weight:700;">Open Practice Terminal</button>
+                    </div>
+                    <p style="font-size:10px; color:#8fb8dc; margin-top:14px;">Learning guide is a built-in demo helper. It does not call an AI service.</p>
+                </div>
+            </div>`;
+        this.updateLearningPath();
+    },
+
+    startLearningCommand(command) {
+        this.launch('terminal');
+        const terminalWindow = Object.values(this.windows).find(win => win.appId === 'terminal');
+        const input = terminalWindow && terminalWindow.el.querySelector('.win-content input');
+        if (input) {
+            input.value = command;
+            input.focus();
+        }
+    },
+
+    recordLearningCommand(command) {
+        this.learningProgress.add(command);
+        this.updateLearningPath();
+    },
+
+    resetLearningPath() {
+        this.learningProgress.clear();
+        this.updateLearningPath();
+    },
+
+    updateLearningPath() {
+        const win = Object.values(this.windows).find(item => item.appId === 'learn');
+        const root = win && win.el.querySelector('.win-content');
+        const list = root && root.querySelector('#learn-steps');
+        if (!list) return;
+        const steps = [
+            { command: 'pwd', title: 'Find your current location', explanation: 'pwd means “print working directory.” It tells you which folder the terminal is in.' },
+            { command: 'ls', title: 'Look around the home folder', explanation: 'ls lists files and folders so you can see what is available.' },
+            { command: 'cat Welcome.txt', title: 'Read the welcome note', explanation: 'cat displays a text file in the terminal without changing it.' },
+            { command: 'mkdir Projects', title: 'Create a project folder', explanation: 'mkdir means “make directory.” It creates a folder named Projects.' },
+            { command: 'cp Welcome.txt Projects/', title: 'Copy the note into Projects', explanation: 'cp copies a file. The first path is the file; the second is its destination.' }
+        ];
+        list.innerHTML = '';
+        let completed = 0;
+        steps.forEach((step, index) => {
+            const done = this.learningProgress.has(step.command);
+            if (done) completed++;
+            const row = document.createElement('div');
+            row.style.cssText = `display:flex; gap:10px; align-items:center; padding:10px; border-radius:9px; background:${done ? 'rgba(26,112,78,.35)' : 'rgba(255,255,255,.06)'}; border:1px solid ${done ? 'rgba(105,218,165,.45)' : 'rgba(255,255,255,.08)'}`;
+            const label = document.createElement('div');
+            label.style.cssText = 'flex:1; min-width:0;';
+            const title = document.createElement('div');
+            title.style.cssText = 'font-size:12px; font-weight:700;';
+            title.textContent = `${done ? '✓' : `${index + 1}.`} ${step.title}`;
+            const explanation = document.createElement('div');
+            explanation.style.cssText = 'font-size:10px; color:#bcd8f0; margin-top:2px;';
+            explanation.textContent = step.explanation;
+            label.append(title, explanation);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = done ? 'Repeat' : `Try: ${step.command}`;
+            button.style.cssText = 'max-width:46%; padding:6px 9px; border-radius:7px; border:1px solid #47749b; background:#16466f; color:white; cursor:pointer; font:11px var(--font-mono);';
+            button.addEventListener('click', () => this.startLearningCommand(step.command));
+            row.append(label, button);
+            list.append(row);
+        });
+        const bar = root.querySelector('#learn-progress-bar');
+        const text = root.querySelector('#learn-progress-label');
+        bar.style.width = `${completed * 20}%`;
+        text.textContent = completed === steps.length ? 'Mission complete — great work!' : `${completed} of ${steps.length} steps done`;
+        if (completed === steps.length) root.querySelector('#learn-tip').textContent = 'You used pwd, ls, cat, mkdir, and cp. Try the mission again, then explore help in the terminal.';
+    },
+
+    renderTerminal(el) {
+        el.style.backgroundColor = '#0b2f57';
+        el.style.fontFamily = "'Ubuntu Mono', monospace";
+        el.style.padding = '12px';
+        el.style.color = '#fff';
+        el.style.fontSize = '13px';
+        el.style.cursor = 'text';
+
+        let cwd = '/home/nobita';
+        el.innerHTML = `
+            <div id="${el.id}-logs" style="line-height:1.5;">
+                <div style="color:#a9cdee;">DoremonOS 1.0 · 4D Pocket Edition</div>
+                <div style="color:#a9cdee; margin-bottom:8px;">Practice shell only — commands run in this page, not on your computer. Type <b>help</b> to see beginner commands.</div>
+            </div>
+            <div style="display:flex; align-items:baseline; margin-top:4px;">
+                <span style="color:#ffd60a; font-weight:bold;">nobita@4d-pocket</span>:<span style="color:#8fd0ff; font-weight:bold;">~</span>$ &nbsp;
+                <input type="text" id="${el.id}-input" style="flex:1; background:transparent; border:none; outline:none; color:white; font-family:'Ubuntu Mono'; font-size:13px;" autofocus>
+            </div>
+        `;
+
+        const input = el.querySelector(`#${el.id}-input`);
+        const logs = el.querySelector(`#${el.id}-logs`);
+        el.onclick = () => input.focus();
+
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                const val = input.value.trim();
+                input.value = '';
+                logs.innerHTML += `<div><span style="color:#ffd60a; font-weight:bold;">nobita@4d-pocket</span>:<span style="color:#8fd0ff; font-weight:bold;">~</span>$ ${escapeHTML(val)}</div>`;
+                if (!val) return;
+
+                const args = val.split(' ');
+                const cmd = args[0].toLowerCase();
+
+                if (cmd === 'help') {
+                    logs.innerHTML += `<div style="color:#ddd; margin:4px 0; white-space:pre-wrap;">Available Commands:
+  gadget    - Pull a random gadget from the 4D Pocket
+  dorayaki  - Feed Doraemon a dorayaki
+  dorasay   - Make the cat say something
+  neofetch  - System overview
+  ls        - List files
+  cat FILE  - View file content
+  echo TEXT - Output text
+  mkdir DIR - Create a practice folder
+  cp FILE DIR - Copy a practice file into a folder
+  htop      - Live process viewer
+  matrix    - Falling code simulation
+  clear     - Clear terminal screen</div>`;
+                } else if (cmd === 'clear') {
+                    logs.innerHTML = '';
+                } else if (cmd === 'neofetch' || cmd === 'fastfetch') {
+                    logs.innerHTML += `<div style="margin:8px 0; display:flex; gap:24px; align-items:flex-start;">
+                        <div style="font-family:var(--font-dora); font-weight:700; font-size:28px; line-height:1;">
+                            <span style="color:#0A9BE8;">Doremon</span><span style="color:#E8112D;">OS</span>
+                            <div style="font-size:12px; color:#FFD60A; margin-top:8px; font-weight:400;">🔔 gadget edition</div>
+                        </div>
+                        <div style="font-size:12px; line-height:1.6;">
+                            <div><b style="color:#FFD60A;">nobita@4d-pocket</b></div>
+                            <div>-------------------</div>
+                            <div><b style="color:#8FD0FF;">OS:</b> DoremonOS 1.0</div>
+                            <div><b style="color:#8FD0FF;">Host:</b> 4D Pocket (single-file runtime)</div>
+                            <div><b style="color:#8FD0FF;">Uptime:</b> 2 hours, 14 mins</div>
+                            <div><b style="color:#8FD0FF;">Packages:</b> 1842 gadgets</div>
+                            <div><b style="color:#8FD0FF;">Shell:</b> bash 5.2.21</div>
+                            <div><b style="color:#8FD0FF;">DE:</b> Dora Desktop</div>
+                            <div><b style="color:#8FD0FF;">WM:</b> Pocket Window Manager</div>
+                            <div><b style="color:#8FD0FF;">CPU:</b> Octa-Core @ 3.40GHz</div>
+                            <div><b style="color:#8FD0FF;">Memory:</b> 3.24GiB / unlimited (4th dimension)</div>
+                        </div>
+                    </div>`;
+                } else if (cmd === 'ls') {
+                    const list = MockFS.list('/home/nobita/Desktop').filter(f => !f.endsWith('/.keep')).map(f => escapeHTML(f.split('/').pop())).join('   ');
+                    const projects = MockFS.get('/home/nobita/Projects/.keep') ? '   Projects/' : '';
+                    logs.innerHTML += `<div style="color:#4a90d9; font-weight:bold; margin:2px 0;">Desktop   Documents   Downloads   Music   Pictures${projects}   ${list}</div>`;
+                    this.recordLearningCommand('ls');
+                } else if (cmd === 'pwd') {
+                    logs.innerHTML += `<div style="color:#eee;">/home/nobita</div>`;
+                    this.recordLearningCommand('pwd');
+                } else if (cmd === 'cat') {
+                    const file = MockFS.get('/home/nobita/Desktop/' + args[1]) || MockFS.get(args[1]);
+                    if (file) {
+                        logs.innerHTML += `<div style="white-space:pre-wrap; color:#eee;">${escapeHTML(file.content)}</div>`;
+                        if ((args[1] || '').toLowerCase() === 'welcome.txt') this.recordLearningCommand('cat Welcome.txt');
+                    }
+                    else logs.innerHTML += `<div style="color:#ff5555;">cat: ${escapeHTML(args[1] || '')}: No such file</div>`;
+                } else if (cmd === 'mkdir') {
+                    const name = args[1];
+                    if (!name || name.includes('/') || name === '.' || name === '..') {
+                        logs.innerHTML += `<div style="color:#ffda75;">Usage: mkdir FOLDER_NAME (practice folders only)</div>`;
+                    } else {
+                        const path = `/home/nobita/${name}`;
+                        MockFS.save(`${path}/.keep`, '');
+                        logs.innerHTML += `<div style="color:#eee;">Created practice folder ${escapeHTML(name)}/</div>`;
+                        if (name === 'Projects' || name === 'projects') this.recordLearningCommand('mkdir Projects');
+                    }
+                } else if (cmd === 'cp') {
+                    const sourceName = args[1];
+                    const targetName = args[2];
+                    const source = sourceName && (MockFS.get('/home/nobita/Desktop/' + sourceName) || MockFS.get(sourceName));
+                    const folder = targetName && targetName.replace(/\/$/, '');
+                    const folderExists = folder && (folder === 'Projects' || folder === 'projects') && MockFS.get(`/home/nobita/${folder}/.keep`);
+                    if (!source || !folderExists) {
+                        logs.innerHTML += `<div style="color:#ffda75;">Usage: cp SOURCE_FILE EXISTING_FOLDER/ — check the name with ls and create the folder first.</div>`;
+                    } else {
+                        MockFS.save(`/home/nobita/${folder}/${source.name}`, source.content);
+                        logs.innerHTML += `<div style="color:#eee;">Copied ${escapeHTML(source.name)} into ${escapeHTML(folder)}/</div>`;
+                        if (source.name === 'Welcome.txt' && folder.toLowerCase() === 'projects') this.recordLearningCommand('cp Welcome.txt Projects/');
+                    }
+                } else if (cmd === 'dorasay' || cmd === 'cowsay') {
+                    const msg = args.slice(1).join(' ') || 'Dorayaki is awesome!';
+                    const bar = '─'.repeat(msg.length + 2);
+                    logs.innerHTML += `<pre style="color:#fff; margin:4px 0;">┌${bar}┐
+│ ${escapeHTML(msg)} │
+└${bar}┘
+   \\
+    \\  (=^･ｪ･^=) 🔔</pre>`;
+                } else if (cmd === 'matrix') {
+                    logs.innerHTML += `<div style="color:#10b981; font-size:11px; line-height:1.2;">01010100 01100101 01110010 01101101 01101001 01101110 01100001 01101100<br>10101011 00101101 11010010 10101101 01010110 10101010 11001100 00110011<br>01001110 01001111 01000010 01001100 01000101 00100000 01001110 01010101<br>[MATRIX RUNTIME DEPLOYED]</div>`;
+                } else if (cmd === 'htop') {
+                    logs.innerHTML += `<div style="background:#12335a; padding:8px; border-radius:6px; font-size:11px;">
+CPU[|||||||||||||||        32.4%]   Tasks: 182, 1 running
+Mem[||||||||||||           28.1%]   Uptime: 02:14:28
+  PID USER      PR  NI    VIRT    RES  CPU% MEM% TIME+ COMMAND
+ 1204 nobita    20   0   2.40G   420M  12.0  2.6 0:42 pocket-shell
+ 1452 nobita    20   0    890M   140M   4.5  0.9 0:18 anywhere-door
+</div>`;
+                } else if (cmd === 'echo') {
+                    logs.innerHTML += `<div style="color:#eee;">${escapeHTML(args.slice(1).join(' '))}</div>`;
+                } else if (cmd === 'dorayaki') {
+                    logs.innerHTML += `<div style="color:#FFD60A;">🥞 Nom nom nom! Doraemon is very happy.</div>`;
+                    audio.beep(880, 'triangle', 0.2, 0.1);
+                } else if (cmd === 'gadget') {
+                    const gadgets = [
+                        'Take-copter: a tiny propeller for your head. Instant flight.',
+                        'Anywhere Door: opens onto any place you can imagine.',
+                        'Memory Bread: press it on a page, eat it, remember everything.',
+                        'Time Machine: hides in a desk drawer. Destination: any time.',
+                        'Translation Konjac: eat it and understand any language.',
+                        'Small Light: shrinks whatever it shines on.'
+                    ];
+                    logs.innerHTML += `<div style="color:#8FD0FF;">🔔 ${gadgets[Math.floor(Math.random() * gadgets.length)]}</div>`;
+                } else {
+                    logs.innerHTML += `<div style="color:#ff6666;">bash: ${escapeHTML(cmd)}: command not found. Type 'help' for options.</div>`;
+                }
+                el.scrollTop = el.scrollHeight;
+            }
+        };
+    },
+
+    renderFiles(el, path) {
+        el.innerHTML = `
+            <div style="height:38px; background:#0f3a66; border-bottom:1px solid #1f4d7e; display:flex; align-items:center; justify-content:space-between; padding:0 12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button style="background:none; border:none; color:white; cursor:pointer;" onclick="DoremonOS.renderFiles(document.getElementById('${el.id}'), '/home/nobita')">🏠</button>
+                    <span style="font-size:12px; background:#0f2d4d; padding:3px 10px; border-radius:4px; border:1px solid #2f679b;">${path}</span>
+                </div>
+                <button onclick="DoremonOS.createFilePrompt('${el.id}', '${path}')" style="background:var(--dora-blue); border:none; color:white; padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600;">+ New File</button>
+            </div>
+            <div style="flex:1; display:flex;">
+                <div style="width:160px; background:#0c2a48; border-right:1px solid #1f4d7e; padding:8px; font-size:12px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="padding:6px; border-radius:6px; cursor:pointer; background:rgba(233,84,32,0.2); font-weight:600;">📁 Home</div>
+                    <div style="padding:6px; border-radius:6px; cursor:pointer;" onclick="DoremonOS.renderFiles(document.getElementById('${el.id}'), '/home/nobita/Desktop')">🖥️ Desktop</div>
+                    <div style="padding:6px; border-radius:6px; cursor:pointer;" onclick="DoremonOS.renderFiles(document.getElementById('${el.id}'), '/home/nobita/Documents')">📄 Documents</div>
+                    <div style="padding:6px; border-radius:6px; cursor:pointer;" onclick="DoremonOS.renderFiles(document.getElementById('${el.id}'), '/home/nobita/Pictures')">🖼️ Pictures</div>
+                </div>
+                <div style="flex:1; padding:16px; display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:16px; align-content:start;" id="${el.id}-grid">
+                </div>
+            </div>
+        `;
+
+        const grid = el.querySelector(`#${el.id}-grid`);
+        const items = MockFS.list(path);
+        if (items.length === 0) {
+            grid.innerHTML = '<div style="color:#8fb8dc; font-size:12px; grid-column:1/-1;">Folder is empty.</div>';
+        } else {
+            items.forEach(filePath => {
+                const file = MockFS.get(filePath);
+                const item = document.createElement('div');
+                item.style.cssText = 'display:flex; flex-direction:column; align-items:center; cursor:pointer; padding:8px; border-radius:8px; text-align:center; font-size:11px;';
+                item.innerHTML = `<span style="font-size:28px;">📄</span><span style="margin-top:4px; word-break:break-word;">${escapeHTML(file.name)}</span>`;
+                item.ondblclick = () => DoremonOS.launch('editor', filePath);
+                grid.appendChild(item);
+            });
+        }
+    },
+
+    createFilePrompt(containerId, path) {
+        const name = prompt('Enter filename:', 'new_document.txt');
+        if (name) {
+            MockFS.save(`${path}/${name}`, '# ' + name + '\nContent created in Nautilus.\n');
+            this.renderFiles(document.getElementById(containerId), path);
+        }
+    },
+
+    renderEditor(el, filePath = 'Welcome.txt') {
+        filePath = filePath || 'Welcome.txt';
+        const fullPath = filePath.startsWith('/') ? filePath : `/home/nobita/Desktop/${filePath}`;
+        const file = MockFS.get(fullPath) || { content: '# New Document\nStart typing...' };
+
+        el.innerHTML = `
+            <div style="height:36px; background:#0f3a66; border-bottom:1px solid #1f4d7e; display:flex; align-items:center; justify-content:space-between; padding:0 12px; font-size:12px;">
+                <div style="font-weight:600;">📝 ${escapeHTML(file.name || 'Untitled')}</div>
+                <div style="display:flex; gap:8px;">
+                    <button id="${el.id}-btn-preview" style="background:#1f4d7e; border:none; color:white; padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer;">Markdown Preview</button>
+                    <button id="${el.id}-btn-save" style="background:var(--dora-blue); border:none; color:white; padding:4px 12px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:600;">Save</button>
+                </div>
+            </div>
+            <div style="flex:1; display:flex;">
+                <textarea id="${el.id}-textarea" style="flex:1; background:#0f2d4d; border:none; outline:none; color:#f0f0f0; padding:12px; font-family:'Ubuntu Mono', monospace; font-size:13px; resize:none; line-height:1.6;">${escapeHTML(file.content)}</textarea>
+                <div id="${el.id}-preview" style="display:none; flex:1; background:#082038; border-left:1px solid #1f4d7e; padding:16px; overflow-y:auto; font-size:13px;"></div>
+            </div>
+            <div style="height:22px; background:#0f3a66; border-top:1px solid #1f4d7e; font-size:10px; color:#a9cdee; display:flex; align-items:center; justify-content:space-between; padding:0 12px;">
+                <span>UTF-8 · Plain Text / Markdown</span>
+                <span id="${el.id}-stats">0 lines</span>
+            </div>
+        `;
+
+        const textarea = el.querySelector(`#${el.id}-textarea`);
+        const preview = el.querySelector(`#${el.id}-preview`);
+        const stats = el.querySelector(`#${el.id}-stats`);
+
+        const updateStats = () => {
+            const lines = textarea.value.split('\n').length;
+            const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
+            stats.innerText = `${lines} lines · ${words} words`;
+        };
+        updateStats();
+        textarea.oninput = updateStats;
+
+        el.querySelector(`#${el.id}-btn-save`).onclick = () => {
+            MockFS.save(fullPath, textarea.value);
+            audio.beep(600, 'sine', 0.1, 0.1);
+            alert('File saved successfully!');
+        };
+
+        el.querySelector(`#${el.id}-btn-preview`).onclick = () => {
+            if (preview.style.display === 'none') {
+                preview.style.display = 'block';
+                preview.innerHTML = escapeHTML(textarea.value)
+                    .replace(/^# (.*$)/gim, '<h2 style="color:var(--dora-blue); border-bottom:1px solid #1f4d7e; padding-bottom:4px;">$1</h2>')
+                    .replace(/^## (.*$)/gim, '<h3 style="color:#ddd;">$1</h3>')
+                    .replace(/^- (.*$)/gim, '<li>$1</li>')
+                    .replace(/\n/gim, '<br>');
+            } else {
+                preview.style.display = 'none';
+            }
+        };
+    },
+
+    renderBrowser(el) {
+        el.innerHTML = `
+            <div style="height:40px; background:#0f3a66; border-bottom:1px solid #1f4d7e; display:flex; align-items:center; gap:8px; padding:0 12px;">
+                <button style="background:none; border:none; color:white; font-size:14px; cursor:pointer;" onclick="DoremonOS.loadBrowserArticle('${el.id}', 'dora')">🏠</button>
+                <input type="text" id="${el.id}-url" value="https://en.wikipedia.org/wiki/Doraemon" style="flex:1; background:#0a2542; border:1px solid #2f679b; border-radius:9999px; padding:4px 14px; color:white; font-size:12px; outline:none;">
+                <button style="background:var(--dora-blue); border:none; color:white; border-radius:9999px; padding:4px 12px; font-size:11px; cursor:pointer; font-weight:600;">Go</button>
+            </div>
+            <div style="height:26px; background:#0d2f50; border-bottom:1px solid #1f4d7e; display:flex; align-items:center; gap:16px; padding:0 14px; font-size:11px; color:#bcd8f0;">
+                <span style="cursor:pointer;" onclick="DoremonOS.loadBrowserArticle('${el.id}', 'dora')">Doraemon</span>
+                <span style="cursor:pointer;" onclick="DoremonOS.loadBrowserArticle('${el.id}', 'news')">Dorayaki Daily</span>
+                <span style="cursor:pointer;" onclick="DoremonOS.loadBrowserArticle('${el.id}', 'fujio')">Fujiko F. Fujio</span>
+                <span style="margin-left:auto; font-size:10px; color:#8fb8dc;">Offline sample pages</span>
+            </div>
+            <div id="${el.id}-view" style="flex:1; overflow-y:auto; padding:24px; background:#0a2542; color:#eee;"></div>
+        `;
+        this.loadBrowserArticle(el.id, 'dora');
+    },
+
+    loadBrowserArticle(containerId, type) {
+        const view = document.getElementById(`${containerId}-view`);
+        if (type === 'dora') {
+            view.innerHTML = `
+                <div style="max-width:640px; margin:0 auto 20px auto; background:linear-gradient(135deg, #0A9BE8, #67CBFF); padding:24px; border-radius:12px; color:#fff;">
+                    <h1 style="margin:0 0 6px 0; font-size:26px;">Doraemon: the cat from the 22nd century</h1>
+                    <p style="font-size:13px; line-height:1.6; margin:0;">A robot cat travels back in time to look after a boy named Nobita, pulling a gadget out of his four-dimensional pocket whenever trouble starts.</p>
+                </div>
+                <div style="max-width:640px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div style="background:#12335a; padding:16px; border-radius:8px; border:1px solid #1f4d7e;">
+                        <h4 style="margin:0 0 8px 0; color:#FFD60A;">The 4D Pocket</h4>
+                        <p style="font-size:12px; color:#bcd8f0; line-height:1.5; margin:0;">Holds every gadget, from the Take-copter to the Anywhere Door.</p>
+                    </div>
+                    <div style="background:#12335a; padding:16px; border-radius:8px; border:1px solid #1f4d7e;">
+                        <h4 style="margin:0 0 8px 0; color:#FFD60A;">Dorayaki</h4>
+                        <p style="font-size:12px; color:#bcd8f0; line-height:1.5; margin:0;">His favorite snack: two small pancakes with sweet red bean paste between them.</p>
+                    </div>
+                </div>
+            `;
+        } else if (type === 'news') {
+            view.innerHTML = `
+                <div style="background:#FFD60A; padding:6px 10px; color:#0B2F57; font-weight:bold; font-size:12px; border-radius:4px; margin-bottom:12px;">Dorayaki Daily</div>
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:12px;">
+                    <div>1. <b style="color:#fff;">Local boy skips homework by walking through the Anywhere Door (again)</b> <span style="color:#8fb8dc;">(420 points)</span></div>
+                    <div>2. <b style="color:#fff;">Why the Take-copter beats every commuter train</b> <span style="color:#8fb8dc;">(285 points)</span></div>
+                    <div>3. <b style="color:#fff;">Dorayaki shortage reported across the neighborhood</b> <span style="color:#8fb8dc;">(194 points)</span></div>
+                </div>
+            `;
+        } else {
+            view.innerHTML = `
+                <h2>Fujiko F. Fujio</h2>
+                <p style="font-size:13px; color:#ccc; line-height:1.6;">Fujiko F. Fujio was the pen name of Japanese manga artist Hiroshi Fujimoto, who created Doraemon. The series first appeared in 1969.</p>
+            `;
+        }
+    },
+
+    renderCalculator(el) {
+        el.innerHTML = `
+            <div style="padding:16px; height:100%; display:flex; flex-direction:column; justify-content:space-between; background:#12335a;">
+                <div style="background:#0a2542; padding:16px; border-radius:10px; border:1px solid #1f4d7e; text-align:right;">
+                    <div id="${el.id}-expr" style="font-size:11px; color:#8fb8dc; height:16px;"></div>
+                    <div id="${el.id}-val" style="font-size:32px; font-weight:700; font-family:'Ubuntu Mono';">0</div>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-top:16px;">
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', 'C')" style="background:#2f679b; color:var(--dora-blue); font-weight:bold;">C</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', 'sqrt')">√</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '%')">%</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '/')">÷</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '7')">7</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '8')">8</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '9')">9</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '*')">×</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '4')">4</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '5')">5</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '6')">6</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '-')">−</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '1')">1</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '2')">2</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '3')">3</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '+')">+</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '0')" style="grid-column:span 2;">0</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '.')">.</button>
+                    <button class="calc-btn" onclick="DoremonOS.calcInput('${el.id}', '=')" style="background:var(--dora-blue); color:white; font-weight:bold;">=</button>
+                </div>
+            </div>
+            <style>
+                .calc-btn { height:46px; border-radius:8px; border:none; background:#1f4d7e; color:white; font-size:16px; cursor:pointer; font-weight:600; }
+                .calc-btn:hover { background:#2f679b; }
+            </style>
+        `;
+    },
+
+    calcInput(id, val) {
+        const d = document.getElementById(`${id}-val`);
+        const expr = document.getElementById(`${id}-expr`);
+        if (val === 'C') {
+            d.innerText = '0';
+            expr.innerText = '';
+        } else if (val === '=') {
+            try {
+                const res = Function('"use strict"; return (' + expr.innerText + d.innerText + ')')();
+                d.innerText = res;
+                expr.innerText = '';
+            } catch {
+                d.innerText = 'Error';
+            }
+        } else if (['+', '-', '*', '/'].includes(val)) {
+            expr.innerText = expr.innerText + d.innerText + ' ' + val + ' ';
+            d.innerText = '0';
+        } else if (val === 'sqrt') {
+            d.innerText = Math.sqrt(parseFloat(d.innerText)).toFixed(4);
+        } else {
+            d.innerText = d.innerText === '0' ? val : d.innerText + val;
+        }
+    },
+
+    renderMusic(el) {
+        el.innerHTML = `
+            <div style="padding:20px; height:100%; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(135deg, #0b2f57, #0a2542);">
+                <div style="display:flex; align-items:center; gap:20px;">
+                    <div style="width:120px; height:120px; border-radius:12px; background:linear-gradient(45deg, var(--dora-blue), #1e8fd5); display:flex; align-items:center; justify-content:center; font-size:48px; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+                        🎵
+                    </div>
+                    <div>
+                        <div style="font-size:10px; font-weight:bold; color:var(--dora-blue); text-transform:uppercase;">Ambient Synth Player</div>
+                        <h2 style="margin:4px 0 2px 0;">Dreams in the Pocket</h2>
+                        <div style="font-size:12px; color:#a9cdee;">Gadget Sound Lab · Web Audio Synth</div>
+                    </div>
+                </div>
+
+                <!-- Equalizer Visualizer Spectrum Bars -->
+                <div id="${el.id}-bars" style="height:60px; display:flex; align-items:flex-end; gap:6px; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+                    ${Array.from({length: 16}).map(() => '<div style="flex:1; height:8px; background:var(--dora-blue); border-radius:2px; transition:height 0.15s;"></div>').join('')}
+                </div>
+
+                <div style="display:flex; align-items:center; justify-content:center; gap:20px;">
+                    <button id="${el.id}-toggle" style="width:48px; height:48px; border-radius:50%; background:var(--dora-blue); border:none; color:white; font-size:20px; cursor:pointer;" onclick="DoremonOS.toggleMusic('${el.id}')">▶</button>
+                </div>
+            </div>
+        `;
+    },
+
+    toggleMusic(containerId) {
+        const btn = document.querySelector(`#${containerId}-toggle`);
+        const bars = document.querySelectorAll(`#${containerId}-bars div`);
+        if (audio.isPlaying) {
+            audio.stopMusic();
+            btn.innerText = '▶';
+            bars.forEach(b => b.style.height = '8px');
+        } else {
+            audio.startMusic(() => {
+                bars.forEach(b => b.style.height = (Math.random() * 45 + 10) + 'px');
+            });
+            btn.innerText = '⏸';
+        }
+    },
+
+    renderCalendarApp(el) {
+        el.innerHTML = `
+            <div style="padding:20px; height:100%; display:flex; flex-direction:column; background:#0f2d4d;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2>November 2026</h2>
+                    <span style="font-size:12px; color:#a9cdee;">Time Machine Schedule</span>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; text-align:center; font-size:12px;">
+                    <div style="font-weight:bold; color:#a9cdee;">Sun</div>
+                    <div style="font-weight:bold; color:#a9cdee;">Mon</div>
+                    <div style="font-weight:bold; color:#a9cdee;">Tue</div>
+                    <div style="font-weight:bold; color:#a9cdee;">Wed</div>
+                    <div style="font-weight:bold; color:#a9cdee;">Thu</div>
+                    <div style="font-weight:bold; color:#a9cdee;">Fri</div>
+                    <div style="font-weight:bold; color:#a9cdee;">Sat</div>
+                    ${Array.from({length: 30}).map((_, i) => `
+                        <div style="padding:14px 6px; border-radius:8px; border:1px solid #1f4d7e; ${i+1===4?'background:var(--dora-blue); font-weight:bold;':''}">${i+1}</div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    },
+
+    renderSettings(el) {
+        el.innerHTML = `
+            <div style="display:flex; height:100%; background:#0f2d4d;">
+                <div style="width:160px; background:#0a2542; border-right:1px solid #1f4d7e; padding:12px; font-size:12px; display:flex; flex-direction:column; gap:4px;">
+                    <div style="padding:8px; border-radius:6px; background:var(--dora-blue); font-weight:600;">Appearance</div>
+                    <div style="padding:8px; border-radius:6px; color:#bcd8f0;">Displays</div>
+                    <div style="padding:8px; border-radius:6px; color:#bcd8f0;">About</div>
+                </div>
+                <div style="flex:1; padding:24px; overflow-y:auto; font-size:13px;">
+                    <h3 style="margin-top:0;">Appearance & Style</h3>
+                    <div style="display:flex; gap:16px; margin-bottom:24px;">
+                        <div onclick="DoremonOS.setTheme('dark')" style="flex:1; padding:16px; border:2px solid var(--dora-blue); border-radius:10px; background:#12335a; text-align:center; cursor:pointer;">
+                            <span style="font-size:24px;">🌙</span>
+                            <div style="font-weight:bold; margin-top:6px;">Dark</div>
+                        </div>
+                        <div onclick="DoremonOS.setTheme('light')" style="flex:1; padding:16px; border:1px solid #2f679b; border-radius:10px; background:#1f4d7e; text-align:center; cursor:pointer;">
+                            <span style="font-size:24px;">☀️</span>
+                            <div style="font-weight:bold; margin-top:6px;">Light</div>
+                        </div>
+                    </div>
+
+                    <h4>Wallpaper Background</h4>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <div onclick="DoremonOS.setWallpaper('radial-gradient(ellipse 240px 64px at 18% 24%, rgba(255,255,255,0.95), rgba(255,255,255,0) 70%), radial-gradient(ellipse 320px 84px at 74% 16%, rgba(255,255,255,0.9), rgba(255,255,255,0) 70%), radial-gradient(ellipse 280px 72px at 58% 66%, rgba(255,255,255,0.75), rgba(255,255,255,0) 70%), linear-gradient(180deg, #67CBFF 0%, #1E9BE9 55%, #0B63B0 100%)')" style="height:70px; border-radius:8px; border:2px solid #FFD60A; background:radial-gradient(ellipse 240px 64px at 18% 24%, rgba(255,255,255,0.95), rgba(255,255,255,0) 70%), radial-gradient(ellipse 320px 84px at 74% 16%, rgba(255,255,255,0.9), rgba(255,255,255,0) 70%), radial-gradient(ellipse 280px 72px at 58% 66%, rgba(255,255,255,0.75), rgba(255,255,255,0) 70%), linear-gradient(180deg, #67CBFF 0%, #1E9BE9 55%, #0B63B0 100%); cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">Doraemon Sky</div>
+                        <div onclick="DoremonOS.setWallpaper('radial-gradient(ellipse 260px 70px at 30% 30%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%), linear-gradient(180deg, #FFB24D 0%, #FF8A5B 50%, #7A4FA3 100%)')" style="height:70px; border-radius:8px; border:1px solid rgba(255,255,255,0.3); background:radial-gradient(ellipse 260px 70px at 30% 30%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%), linear-gradient(180deg, #FFB24D 0%, #FF8A5B 50%, #7A4FA3 100%); cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">Dorayaki Sunset</div>
+                        <div onclick="DoremonOS.setWallpaper('radial-gradient(circle at 20% 30%, #FFFFFF 0 1px, transparent 2px), radial-gradient(circle at 60% 20%, #FFFFFF 0 1px, transparent 2px), radial-gradient(circle at 80% 55%, #FFFFFF 0 1px, transparent 2px), radial-gradient(circle at 35% 75%, #FFFFFF 0 1px, transparent 2px), linear-gradient(180deg, #0A1E4A 0%, #123F7E 100%)')" style="height:70px; border-radius:8px; border:1px solid rgba(255,255,255,0.3); background:radial-gradient(circle at 20% 30%, #FFFFFF 0 1px, transparent 2px), radial-gradient(circle at 60% 20%, #FFFFFF 0 1px, transparent 2px), radial-gradient(circle at 80% 55%, #FFFFFF 0 1px, transparent 2px), radial-gradient(circle at 35% 75%, #FFFFFF 0 1px, transparent 2px), linear-gradient(180deg, #0A1E4A 0%, #123F7E 100%); cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">Night Sky</div>
+                        <div onclick="DoremonOS.setWallpaper('linear-gradient(135deg, #FFC2DD 0%, #F58CBB 50%, #C45A94 100%)')" style="height:70px; border-radius:8px; border:1px solid rgba(255,255,255,0.3); background:linear-gradient(135deg, #FFC2DD 0%, #F58CBB 50%, #C45A94 100%); cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.6);">Anywhere Door</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    renderSoftware(el) {
+        el.innerHTML = `
+            <div style="padding:20px; height:100%; overflow-y:auto; background:#0f2d4d;">
+                <h2 style="margin-top:0;">Gadget Store</h2>
+                <p style="font-size:12px; color:#a9cdee; margin-bottom:20px;">Pick a gadget and launch it</p>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div style="background:#133a62; padding:16px; border-radius:10px; border:1px solid #1f4d7e; display:flex; align-items:center; justify-content:space-between;">
+                        <div>
+                            <div style="font-weight:bold;">🐭 Mouse Panic</div>
+                            <div style="font-size:11px; color:#8fb8dc;">Classic logic puzzle game</div>
+                        </div>
+                        <button onclick="DoremonOS.launch('mines')" style="padding:6px 14px; background:var(--dora-blue); border:none; color:white; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">Launch</button>
+                    </div>
+                    <div style="background:#133a62; padding:16px; border-radius:10px; border:1px solid #1f4d7e; display:flex; align-items:center; justify-content:space-between;">
+                        <div>
+                            <div style="font-weight:bold;">🎤 Gian Concert</div>
+                            <div style="font-size:11px; color:#8fb8dc;">Music player and synthesizer</div>
+                        </div>
+                        <button onclick="DoremonOS.launch('music')" style="padding:6px 14px; background:var(--dora-blue); border:none; color:white; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">Launch</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    renderMines(el) {
+        el.innerHTML = `
+            <div style="padding:16px; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:space-between; background:#12335a;">
+                <div style="width:100%; display:flex; justify-content:space-between; background:#0a2542; padding:8px 16px; border-radius:8px; border:1px solid #1f4d7e;">
+                    <span id="${el.id}-mines" style="color:#ff5555; font-family:'Ubuntu Mono'; font-size:18px; font-weight:bold;">010</span>
+                    <button onclick="DoremonOS.initMinesGrid('${el.id}')" style="background:none; border:none; font-size:18px; cursor:pointer;">🙂</button>
+                    <span id="${el.id}-time" style="color:#ff5555; font-family:'Ubuntu Mono'; font-size:18px; font-weight:bold;">000</span>
+                </div>
+                <div id="${el.id}-grid" style="display:grid; grid-template-columns:repeat(9, 30px); gap:3px; margin:16px 0;"></div>
+                <div style="font-size:11px; color:#8fb8dc;">Left click to dig, right click to flag</div>
+            </div>
+        `;
+        this.initMinesGrid(el.id);
+    },
+
+    initMinesGrid(containerId) {
+        const grid = document.getElementById(`${containerId}-grid`);
+        grid.innerHTML = '';
+        for (let i = 0; i < 81; i++) {
+            const cell = document.createElement('div');
+            cell.style.cssText = 'width:30px; height:30px; background:#1f5185; border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; font-size:12px;';
+            const isMine = Math.random() < 0.12;
+            cell.onclick = () => {
+                if (isMine) {
+                    cell.innerText = '🐭';
+                    cell.style.background = '#ff4444';
+                    alert('Eek! A mouse! Game over.');
+                } else {
+                    cell.innerText = Math.floor(Math.random() * 3 + 1);
+                    cell.style.background = '#16406b';
+                }
+            };
+            cell.oncontextmenu = (e) => {
+                e.preventDefault();
+                cell.innerText = cell.innerText === '🔔' ? '' : '🔔';
+            };
+            grid.appendChild(cell);
+        }
+    },
+
+    // 6. Shell Popovers & Menus
+    toggleCalendar() {
+        const p = document.getElementById('calendar-popover');
+        p.classList.toggle('open');
+        document.getElementById('quick-settings-popover').classList.remove('open');
+    },
+
+    toggleQuickSettings() {
+        const p = document.getElementById('quick-settings-popover');
+        p.classList.toggle('open');
+        document.getElementById('calendar-popover').classList.remove('open');
+    },
+
+    renderMiniCalendar() {
+        const cal = document.getElementById('mini-calendar');
+        ['S','M','T','W','T','F','S'].forEach(d => {
+            cal.innerHTML += `<div style="color:#8fb8dc; font-weight:bold;">${d}</div>`;
+        });
+        for (let i = 1; i <= 30; i++) {
+            cal.innerHTML += `<div style="padding:4px; border-radius:4px; ${i===4?'background:var(--dora-blue); font-weight:bold;':''}">${i}</div>`;
+        }
+    },
+
+    toggleActivities() {
+        const overlay = document.getElementById('activities-overlay');
+        overlay.classList.toggle('open');
+        if (overlay.classList.contains('open')) {
+            this.renderActivitiesContent();
+            document.getElementById('activities-search').focus();
+        }
+    },
+
+    renderActivitiesContent() {
+        const winGrid = document.getElementById('activities-windows-grid');
+        winGrid.innerHTML = '';
+        Object.entries(this.windows).forEach(([id, win]) => {
+            const meta = APPS[win.appId];
+            const card = document.createElement('div');
+            card.style.cssText = 'background:#133a62; padding:16px; border-radius:12px; border:1px solid #2f679b; cursor:pointer; text-align:center;';
+            card.innerHTML = `<div style="font-size:36px; margin-bottom:8px;">${meta.icon}</div><div style="font-weight:bold; font-size:13px;">${meta.title}</div>`;
+            card.onclick = () => {
+                this.toggleActivities();
+                this.focusWindow(id);
+            };
+            winGrid.appendChild(card);
+        });
+
+        const appGrid = document.getElementById('activities-app-grid');
+        appGrid.innerHTML = '';
+        Object.entries(APPS).forEach(([appId, meta]) => {
+            const card = document.createElement('div');
+            card.style.cssText = 'display:flex; flex-direction:column; align-items:center; cursor:pointer; text-align:center; padding:10px; border-radius:10px; width:100px;';
+            card.innerHTML = `<div style="width:54px; height:54px; background:rgba(255,255,255,0.08); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:6px;">${meta.icon}</div><span style="font-size:11px;">${meta.title}</span>`;
+            card.onclick = () => {
+                this.toggleActivities();
+                this.launch(appId);
+            };
+            appGrid.appendChild(card);
+        });
+    },
+
+    onSearch(q) {
+        const query = q.toLowerCase();
+        document.querySelectorAll('#activities-app-grid > div').forEach(el => {
+            const text = el.innerText.toLowerCase();
+            el.style.display = text.includes(query) ? 'flex' : 'none';
+        });
+    },
+
+    selectShortcut(el) {
+        document.querySelectorAll('.desktop-shortcut').forEach(s => s.classList.remove('selected'));
+        el.classList.add('selected');
+    },
+
+    openContextMenu(x, y) {
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'flex';
+        menu.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+        menu.style.top = Math.min(y, window.innerHeight - 220) + 'px';
+    },
+
+    closeContextMenu() {
+        document.getElementById('context-menu').style.display = 'none';
+        document.getElementById('calendar-popover').classList.remove('open');
+        document.getElementById('quick-settings-popover').classList.remove('open');
+    },
+
+    newFolder() {
+        const name = prompt('Folder name:', 'New Folder');
+        if (name) {
+            MockFS.save(`/home/nobita/Desktop/${name}/.keep`, '');
+            alert(`Created folder: ${name}`);
+        }
+    },
+
+    newDocument() {
+        const name = prompt('File name:', 'document.txt');
+        if (name) {
+            MockFS.save(`/home/nobita/Desktop/${name}`, '# New file\n');
+            this.launch('editor', name);
+        }
+    },
+
+    toggleWifi() {
+        this.settings.wifi = !this.settings.wifi;
+        document.getElementById('qs-wifi-status').innerText = this.settings.wifi ? 'Connected' : 'Off';
+        document.getElementById('tray-wifi').innerText = this.settings.wifi ? '📶' : '📵';
+    },
+
+    toggleDarkMode() {
+        this.settings.darkMode = !this.settings.darkMode;
+        document.getElementById('qs-dark-status').innerText = this.settings.darkMode ? 'On' : 'Off';
+        this.setTheme(this.settings.darkMode ? 'dark' : 'light');
+    },
+
+    toggleNightLight() {
+        this.settings.nightLight = !this.settings.nightLight;
+        document.getElementById('qs-night-status').innerText = this.settings.nightLight ? 'On' : 'Off';
+        document.getElementById('night-light-overlay').style.opacity = this.settings.nightLight ? '0.35' : '0';
+    },
+
+    setVolume(v) {
+        this.settings.volume = v;
+        document.getElementById('volume-val').innerText = v + '%';
+        document.getElementById('tray-sound').innerText = v == 0 ? '🔇' : '🔊';
+    },
+
+    setBrightness(b) {
+        this.settings.brightness = b;
+        document.getElementById('brightness-val').innerText = b + '%';
+        document.getElementById('desktop').style.filter = `brightness(${b}%)`;
+    },
+
+    setWallpaper(css) {
+        this.settings.wallpaper = css;
+        document.getElementById('desktop').style.background = css;
+    },
+
+    setTheme(t) {
+        const desktop = document.getElementById('desktop');
+        const isLight = t === 'light';
+        desktop.classList.toggle('light-theme', isLight);
+        this.settings.darkMode = !isLight;
+        const status = document.getElementById('qs-dark-status');
+        if (status) status.innerText = isLight ? 'Off' : 'On';
+    },
+
+    lockScreen() {
+        alert('Screen Locked. Click OK to unlock your session.');
+    },
+
+    powerOffDialog() {
+        if (confirm('Power off DoremonOS session?')) {
+            window.location.reload();
+        }
+    }
+};
+
+// Boot OS on DOM Ready
+window.addEventListener('DOMContentLoaded', () => {
+    DoremonOS.init();
+});
+</script>
+</body>
+</html>
